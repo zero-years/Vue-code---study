@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   //   h,
+      //   render,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import { h, ref, createApp, nextTick } from '../dist/vue.esm.js'
+
+      const Child = {
+        setup(props, { emit }) {
+          return () => {
+            return h(
+              'button',
+              {
+                onClick() {
+                  emit('foo', 1, 2, 3)
+                },
+              },
+              '我是子组件的按钮',
+            )
+          }
+        },
+      }
+
+      const Comp = {
+        setup() {
+          // 这种传递事件的方式和模板里的 @ 是一样的
+          // <Child @foo=() => {}></Child>
+          return () => {
+            return h('div', [
+              h('p', '我是父组件的p标签'),
+              h(Child, {
+                onFoo(a, b, c) {
+                  console.log('我是父组件传递的')
+                  console.log(a, b, c)
+                },
+              }),
+            ])
+          }
+        },
+      }
+
+      createApp(Comp).mount('#app')
+    </script>
+  </body>
+</html>

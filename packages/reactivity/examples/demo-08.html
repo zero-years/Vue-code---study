@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        padding: 150px;
+      }
+      #app,
+      #dv {
+        width: 100px;
+        height: 100px;
+        background: red;
+      }
+      #dv {
+        background: black;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="dv"></div>
+    <button id="btn">按钮</button>
+    <script type="module">
+      import {
+        effect,
+        ref,
+        computed,
+        watch,
+        reactive,
+      } from '../dist/reactivity.esm.js'
+
+      const count = ref(0)
+      const state = ref(['a', 'b', 'c', 'd'])
+
+      // 更新数组的 length
+      // 更新前 state.length = 4 ==> ['a', 'b', 'c', 'd']
+      // 更新后 state.length = 2 ==> ['a', 'b']
+      // 此时需要通知绑定了 c 和 d 的 effect 重新执行，也就是那些索引大于等于 length 的内容
+
+      /**
+       * 隐式更新 length ，例如 push、 pop等
+       * 更新前 state.length = 4 ==> ['a', 'b', 'c', 'd']
+       * 更新后 state.length = 5 ==> ['a', 'b', 'c', 'd', 'e']
+       * 更新动作，以 push 为例，追加了一个 e
+       * 隐式更新的方法: push pop shift unshift
+       * 通过对比一个更新前与一个更新后的 length 来判断是否有隐式更新
+       * */
+
+      effect(() => {
+        console.log('statep[3] ==>', statep[3])
+      })
+
+      setTimeout(() => {
+        // state[3] = 'e'
+        // state.length = 2 // ['a', 'b']
+        state.push('e')
+        console.log('state ==>', state)
+      }, 1000)
+    </script>
+  </body>
+</html>

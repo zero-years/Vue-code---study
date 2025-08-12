@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   //   h,
+      //   render,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import { h, ref, createApp, getCurrentInstance } from '../dist/vue.esm.js'
+
+      /**
+       * 组件的生命周期
+       *
+       * 挂载
+       * onBeforeMount
+       * onMounted
+       *
+       * 更新
+       * onBeforeUpdate
+       * onUpdated
+       *
+       * 卸载
+       * onBeforeUnmount
+       * onMounted
+       *
+       */
+      const Comp = {
+        setup() {
+          const vm = getCurrentInstance()
+
+          return () => {
+            return h('div', [h('p', '我是父组件的p标签')])
+          }
+        },
+      }
+
+      createApp(Comp).mount('#app')
+    </script>
+  </body>
+</html>

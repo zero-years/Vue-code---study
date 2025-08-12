@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        padding: 150px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <button id="flagBtn">更新 flag</button>
+    <button id="nameBtn">更新 name</button>
+    <button id="ageBtn">更新 age</button>
+    <script type="module">
+      import { ref, effect } from '../dist/reactivity.esm.js'
+
+      const flag = ref(true)
+      const name = ref('zyear')
+      const age = ref(22)
+
+      let count = 0
+
+      effect(() => {
+        console.count('effect')
+        if (count > 0) return
+        count++
+        if (flag.value) {
+          app.innerHTML = name.value
+        } else {
+          app.innerHTML = age.value
+        }
+      })
+
+      flagBtn.onclick = () => {
+        flag.value = !flag.value
+      }
+
+      nameBtn.onclick = () => {
+        name.value = name.value + Math.random()
+      }
+
+      ageBtn.onclick = () => {
+        age.value++
+      }
+    </script>
+  </body>
+</html>

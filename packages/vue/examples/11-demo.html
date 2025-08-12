@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <button id="btn">count++</button>
+
+    <script type="module">
+      // import {
+      //   //   h,
+      //   render,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import {
+        h,
+        render,
+        ref,
+        Text,
+        createApp,
+        nextTick,
+      } from '../dist/vue.esm.js'
+
+      const Child = {
+        props: ['age'],
+
+        setup(props) {
+          return () => {
+            return h('div', ['我是子组件', '我的年龄是', props.age])
+          }
+        },
+      }
+
+      const Comp = {
+        /**props 有两种
+         * 1. props: 由用户声明的内容就是 props
+         * 2. attrs: 用户
+         * createApp(Comp，{ msg: 'hellp', count: 0}).mount('#app') === <comp msg='hellp' :count=0></comp>
+         * 上方两个内容中, 因为只有 msg 被用户声明过，因此 msg 是 props ，count 是 attrs
+         *
+         */
+        props: ['msg'],
+        // props: {
+        //   mas: String,
+        // },
+        setup(props, { attrs }) {
+          const age = ref(0)
+
+          btn.onclick = () => {
+            age.value++
+          }
+
+          return () => {
+            return h(Child, { age: age.value })
+          }
+        },
+      }
+
+      createApp(Comp).mount('#app')
+    </script>
+  </body>
+</html>

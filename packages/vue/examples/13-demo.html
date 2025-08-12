@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   //   h,
+      //   render,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import { h, ref, createApp, nextTick } from '../dist/vue.esm.js'
+
+      const Child = {
+        setup(props, { slots }) {
+          return () => {
+            // return h('div', [
+            //   h('div', '我是子组件'),
+            //   slots.header(),
+            //   slots.default(),
+            //   slots.footer({ a: '子组件传递的值， 给 footer 的' }),
+            // ])
+            return h('div', [slots.default(), '子组件自己的内容'])
+          }
+        },
+      }
+
+      const Comp = {
+        setup() {
+          // 这种传递事件的方式和模板里的 @ 是一样的
+          // <Child @foo=() => {}></Child>
+          return () => {
+            // return h('div', [
+            //   h('p', '我是父组件的p标签'),
+            //   h(Child, null, {
+            //     // 具名插槽
+            //     header: () => h('div', '父组件传递的插槽 header'),
+            //     // 默认插槽
+            //     default: () => h('div', '默认插槽'),
+            //     // 作用域插槽
+            //     footer: ({ a }) => h('div', '父组件传递的插槽 fotter' + a),
+            //   }),
+            // ])
+            return h('div', [
+              h('p', '我是父组件的p标签'),
+              h(Child, null, () => h('div', '默认插槽')),
+            ])
+          }
+        },
+      }
+
+      createApp(Comp).mount('#app')
+    </script>
+  </body>
+</html>

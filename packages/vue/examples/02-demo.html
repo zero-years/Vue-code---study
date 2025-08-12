@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import {
+        //   h,
+        render,
+      } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import { renderOptions, h } from '../dist/vue.esm.js'
+
+      /**
+       * h 函数的使用方法
+       *  - 1. h('div', 'hellow world') 第二个参数为子节点
+       *  - 2. h('div', [h('span', 'hellow'), h('span', 'world')]) 第二个参数为子节点
+       *  - 3. h('div', h('span', 'hello')) 第二个参数为子节点
+       *  - 4. h('div', { class: 'container' }) 第二个参数为 props
+       * -------- 三个参数 ---------
+       *  - 5. h('div', { class: 'container' }, 'hellow world')
+       *  - 6. h('div', { class: 'container' }, h('span', 'hellow world'))
+       *  - 7. h('div', { class: 'container' }, h('span', 'hellow'), h('span', ' world'))
+       *  - 8. h('div', { class: 'container' }, [h('span', 'hellow'), h('span', ' world')])
+       */
+
+      const vnode = h(
+        'div',
+        {
+          id: 'aaa',
+        },
+        'hellow world',
+      )
+      console.log('vnode ==>', vnode)
+
+      render(vnode, app)
+    </script>
+  </body>
+</html>

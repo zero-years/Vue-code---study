@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        padding: 150px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { reactive, effect, ref } from '../dist/reactivity.esm.js'
+
+      //region
+      // const a = ref(0)
+
+      // // 如果 target.a 是一个 ref， 则不需要通过 target.a.value 来获取它的值
+      // // 如果更新 reactive 里面 a 的值之前是个 ref ，则需要同步更新 a 的 ref 的值为 newValue
+      // // 如果更新的 newValue 是一个 ref ，那就不需要同步更新
+      // const count = reactive({ a })
+
+      // effect(() => {
+      //   console.log(count.a)
+      // })
+
+      // setTimeout(() => {
+      //   count.a = 1
+      //   console.log(a)
+      // }, 1000)
+      // endregion
+
+      const state = reactive({
+        a: {
+          b: 0,
+        },
+      })
+
+      effect(() => {
+        console.log(count.a.b)
+      })
+
+      setTimeout(() => {
+        count.a.b = 1
+      }, 1000)
+    </script>
+  </body>
+</html>

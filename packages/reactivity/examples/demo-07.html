@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        padding: 150px;
+      }
+      #app,
+      #dv {
+        width: 100px;
+        height: 100px;
+        background: red;
+      }
+      #dv {
+        background: black;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="dv"></div>
+    <button id="btn">按钮</button>
+    <script type="module">
+      import {
+        effect,
+        ref,
+        computed,
+        watch,
+        reactive,
+      } from '../dist/reactivity.esm.js'
+
+      // const count = ref(0)
+      // const state = ref({
+      //   a: {
+      //     b: 1,
+      //     c: {
+      //       d: 2,
+      //     },
+      //   },
+      // })
+
+      // 深层次监听
+      // const stop = watch(
+      //   state,
+      //   (newVal, oldVal) => {
+      //     console.log('newVal, oldVal =>', newVal, oldVal)
+      //   },
+      //   {
+      //     deep: true,
+      //   },
+      // )
+
+      // setTimeout(() => {
+      //   state.value.a.b = 2
+      // }, 1000)
+
+      // 分层级进行深层次监听
+      // const stop = watch(
+      //   state,
+      //   (newVal, oldVal) => {
+      //     console.log('newVal, oldVal =>', newVal, oldVal)
+      //   },
+      //   {
+      //     deep: 2,
+      //   },
+      // )
+
+      // setTimeout(() => {
+      //   state.value.a.c.d = 3
+      // }, 1000)
+
+      // reactive 监听
+      // 在官方中，如果值是 reactive ，则默认 deep 为 true，如果 deep 传入值，则以传入的为主
+      // const state = reactive({
+      //   a: {
+      //     b: 1,
+      //     c: {
+      //       d: 2,
+      //     },
+      //   },
+      // })
+      // const stop = watch(
+      //   state,
+      //   (newVal, oldVal) => {
+      //     console.log('newVal, oldVal =>', newVal, oldVal)
+      //   },
+      //   {
+      //     deep: 2,
+      //   },
+      // )
+
+      // setTimeout(() => {
+      //   state.value.a.c.d = 3
+      // }, 1000)
+
+      const flag = ref(true)
+
+      watch(flag, (newVal, oldVal, onCleanup) => {
+        const dom = newVal ? app : dv
+
+        function handler() {
+          console.log(newVal ? '点击了 app' : '点击了 dv')
+        }
+
+        dom.addEventListener('click', handler)
+
+        onCleanup(() => {
+          dom.removeEventListener('click', handler())
+        })
+      })
+
+      btn.onclick = () => {
+        flag.value = !flag.value
+      }
+    </script>
+  </body>
+</html>

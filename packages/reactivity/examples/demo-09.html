@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        padding: 150px;
+      }
+      #app,
+      #dv {
+        width: 100px;
+        height: 100px;
+        background: red;
+      }
+      #dv {
+        background: black;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="dv"></div>
+    <button id="btn">按钮</button>
+    <script type="module">
+      import {
+        effect,
+        ref,
+        computed,
+        watch,
+        reactive,
+        toRef,
+        toRefs,
+      } from '../dist/reactivity.esm.js'
+
+      /**
+       * toRef
+       * toRefs
+       * unref
+       * proxyRefs
+       *
+       */
+
+      // const count = ref(0)
+      // const state = reactive({
+      //   name: 'zs',
+      //   age: 12,
+      // })
+
+      // let name = toRef(state, 'name')
+
+      // console.log('name ==>', name)
+
+      // effect(() => {
+      //   console.log(state.name)
+      // })
+
+      // setTimeout(() => {
+      //   name.value = 'zy'
+      // }, 1000)
+
+      const count = ref(0)
+      const state = reactive({
+        name: 'zs',
+        age: 12,
+      })
+
+      const { name, age } = toRefs(state)
+
+      console.log('name ==>', name)
+
+      effect(() => {
+        console.log(state.name)
+      })
+
+      setTimeout(() => {
+        name.value = 'zy'
+      }, 1000)
+    </script>
+  </body>
+</html>
