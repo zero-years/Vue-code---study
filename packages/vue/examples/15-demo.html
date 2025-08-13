@@ -14,7 +14,18 @@
       //   render,
       // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
 
-      import { h, ref, createApp, getCurrentInstance } from '../dist/vue.esm.js'
+      import {
+        h,
+        ref,
+        createApp,
+        getCurrentInstance,
+        onBeforeMount,
+        onMounted,
+        onUpdated,
+        onBeforeUpdate,
+        onBeforeUnmount,
+        onUnmounted,
+      } from '../dist/vue.esm.js'
 
       /**
        * 组件的生命周期
@@ -32,17 +43,89 @@
        * onMounted
        *
        */
-      const Comp = {
-        setup() {
-          const vm = getCurrentInstance()
+      const Child = {
+        props: ['count'],
+        setup(props) {
+          // onBeforeMount(() => {
+          //   console.log('子组件挂载前')
+          // })
+
+          // onMounted(() => {
+          //   console.log('子组件挂载后')
+          // })
+
+          // onUpdated(() => {
+          //   console.log('子组件更新后')
+          // })
+
+          // onBeforeUpdate(() => {
+          //   console.log('子组件更新前')
+          // })
+
+          // onBeforeUnmount(() => {
+          //   console.log('子组件卸载前')
+          // })
+
+          // onUnmounted(() => {
+          //   console.log('子组件卸载后')
+          // })
 
           return () => {
-            return h('div', [h('p', '我是父组件的p标签')])
+            return h('div', ['我是子组件', props.count])
           }
         },
       }
 
-      createApp(Comp).mount('#app')
+      const Comp = {
+        setup() {
+          const count = ref(0)
+
+          onBeforeMount(() => {
+            console.log('父组件挂载前')
+          })
+
+          onMounted(() => {
+            console.log(getCurrentInstance())
+            console.log('父组件挂载后')
+          })
+
+          onUpdated(() => {
+            console.log('父组件更新后')
+          })
+
+          onBeforeUpdate(() => {
+            console.log('父组件更新前')
+          })
+
+          onBeforeUnmount(() => {
+            console.log(document.querySelector('#one'))
+            console.log('父组件卸载前')
+          })
+
+          onUnmounted(() => {
+            console.log('父组件卸载后')
+          })
+
+          setTimeout(() => {
+            count.value++
+          }, 1000)
+
+          return () => {
+            return h('div', [
+              h('p', { id: 'one' }, '我是父组件的p标签'),
+              h(Child, { count: count.value }),
+            ])
+          }
+        },
+      }
+
+      const app = createApp(Comp)
+
+      app.mount('#app')
+
+      setTimeout(() => {
+        app.unmount()
+      }, 2000)
     </script>
   </body>
 </html>

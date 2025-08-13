@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   //   h,
+      //   render,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import {
+        h,
+        ref,
+        createApp,
+        getCurrentInstance,
+        onBeforeMount,
+        onMounted,
+        onUpdated,
+        onBeforeUpdate,
+        onBeforeUnmount,
+        onUnmounted,
+      } from '../dist/vue.esm.js'
+
+      const Child = {
+        props: ['count'],
+        setup(props, { attrs, slots, emit, expose }) {
+          /**
+           * expose 子组件给父组件暴露的方法，父组件可以通过 ref 获取
+           */
+          expose({
+            foo() {
+              console.log('子组件暴露的 foo 方法')
+            },
+          })
+
+          return () => {
+            return h('div', ['我是子组件'])
+          }
+        },
+      }
+
+      const Comp = {
+        setup() {
+          return () => {
+            return h('div', [
+              h('p', { id: 'one' }, '我是父组件的p标签'),
+              h(Child),
+            ])
+          }
+        },
+      }
+
+      const app = createApp(Comp)
+
+      app.mount('#app')
+
+      setTimeout(() => {
+        app.unmount()
+      }, 2000)
+    </script>
+  </body>
+</html>

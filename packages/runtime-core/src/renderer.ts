@@ -7,6 +7,7 @@ import { queueJob } from './scheduler'
 import { shouldUpdateComponent } from './componentRenderUtils'
 import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
+import { triggerHooks, LifeCycleHooks } from './apiLifecycle'
 
 export function createRenderer(options) {
   /**
@@ -91,13 +92,31 @@ export function createRenderer(options) {
   }
 
   /**
+   * 卸载组件实例
+   * @param instance
+   */
+  const unmountComponent = instance => {
+    // 生命周期卸载前
+    triggerHooks(instance, LifeCycleHooks.BEFORE_UNMOUNTED)
+
+    // 把 subTree 卸载掉
+    unmount(instance.subTree)
+
+    // 生命周期卸载后
+    triggerHooks(instance, LifeCycleHooks.UNMOUNTED)
+  }
+
+  /**
    * 卸载节点用的函数
    * @param vnode 要卸载的节点
    */
   const unmount = vnode => {
-    const { type, shapeFlag, children } = vnode
+    const { shapeFlag, children } = vnode
 
-    if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+    if (shapeFlag & ShapeFlags.COMPONENT) {
+      // 子节点为组件
+      unmountComponent(vnode.component)
+    } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       // 子节点为数组，需要递归卸载
       unmountChildren(children)
     }
@@ -552,8 +571,13 @@ export function createRenderer(options) {
        * 区分挂载和更新
        */
       if (!instance.isMounted) {
+        // 实例挂载的处理逻辑
+
         // 拿到 vnode 的虚拟节点
         const { vnode, render } = instance
+
+        // 生命周期挂载前
+        triggerHooks(instance, LifeCycleHooks.BEFORE_MOUNT)
 
         // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
         const subTree = render.call(instance.proxy)
@@ -569,7 +593,11 @@ export function createRenderer(options) {
 
         // 将挂载状态更新
         instance.isMounted = true
+
+        // 生命周期挂载完
+        triggerHooks(instance, LifeCycleHooks.MOUNTED)
       } else {
+        // 更新的逻辑
         let { vnode, next } = instance
 
         if (next) {
@@ -580,6 +608,9 @@ export function createRenderer(options) {
           // next 只有当子组件发生更新时才有
           next = vnode
         }
+
+        // 生命周期更新前
+        triggerHooks(instance, LifeCycleHooks.BEFORE_UPDATE)
 
         const prevSubTree = instance.subTree
 
@@ -594,6 +625,9 @@ export function createRenderer(options) {
 
         // 保存最新的 subTree
         instance.subTree = subTree
+
+        // 生命周期更新完
+        triggerHooks(instance, LifeCycleHooks.UPDATED)
       }
     }
 

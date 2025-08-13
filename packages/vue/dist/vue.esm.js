@@ -880,6 +880,45 @@ function shouldUpdateComponent(n1, n2) {
   return hasPropsChanged(prevProps, nextProps);
 }
 
+// packages/runtime-core/src/apiLifecycle.ts
+var LifeCycleHooks = /* @__PURE__ */ ((LifeCycleHooks2) => {
+  LifeCycleHooks2["BEFORE_MOUNT"] = "bm";
+  LifeCycleHooks2["MOUNTED"] = "m";
+  LifeCycleHooks2["BEFORE_UPDATE"] = "bu";
+  LifeCycleHooks2["UPDATED"] = "u";
+  LifeCycleHooks2["BEFORE_UNMOUNTED"] = "bum";
+  LifeCycleHooks2["UNMOUNTED"] = "um";
+  return LifeCycleHooks2;
+})(LifeCycleHooks || {});
+function createHook(type) {
+  return (hook, target = getCurrentInstance()) => {
+    injectHook(target, hook, type);
+  };
+}
+function injectHook(target, hook, type) {
+  if (target[type] == null) {
+    target[type] = [];
+  }
+  const _hook = () => {
+    setCurrentInstance(target);
+    hook();
+    unsetCurrentInstance;
+  };
+  target[type].push(_hook);
+}
+function triggerHooks(instance, type) {
+  const hooks = instance[type];
+  if (hooks) {
+    hooks.forEach((hook) => hook());
+  }
+}
+var onBeforeMount = createHook("bm" /* BEFORE_MOUNT */);
+var onMounted = createHook("m" /* MOUNTED */);
+var onBeforeUpdate = createHook("bu" /* BEFORE_UPDATE */);
+var onUpdated = createHook("u" /* UPDATED */);
+var onBeforeUnmount = createHook("bum" /* BEFORE_UNMOUNTED */);
+var onUnmounted = createHook("um" /* UNMOUNTED */);
+
 // packages/runtime-core/src/renderer.ts
 function createRenderer(options) {
   const {
@@ -920,9 +959,16 @@ function createRenderer(options) {
       unmount(children[i]);
     }
   };
+  const unmountComponent = (instance) => {
+    triggerHooks(instance, "bum" /* BEFORE_UNMOUNTED */);
+    unmount(instance.subTree);
+    triggerHooks(instance, "um" /* UNMOUNTED */);
+  };
   const unmount = (vnode) => {
-    const { type, shapeFlag, children } = vnode;
-    if (shapeFlag & 16 /* ARRAY_CHILDREN */) {
+    const { shapeFlag, children } = vnode;
+    if (shapeFlag & 6 /* COMPONENT */) {
+      unmountComponent(vnode.component);
+    } else if (shapeFlag & 16 /* ARRAY_CHILDREN */) {
       unmountChildren(children);
     }
     hostRemove(vnode.el);
@@ -1107,11 +1153,13 @@ function createRenderer(options) {
     const componentUpdateFn = () => {
       if (!instance.isMounted) {
         const { vnode, render: render3 } = instance;
+        triggerHooks(instance, "bm" /* BEFORE_MOUNT */);
         const subTree = render3.call(instance.proxy);
         vnode.el = subTree.el;
         patch(null, subTree, container, anchor);
         instance.subTree = subTree;
         instance.isMounted = true;
+        triggerHooks(instance, "m" /* MOUNTED */);
       } else {
         let { vnode, next } = instance;
         if (next) {
@@ -1119,11 +1167,13 @@ function createRenderer(options) {
         } else {
           next = vnode;
         }
+        triggerHooks(instance, "bu" /* BEFORE_UPDATE */);
         const prevSubTree = instance.subTree;
         const subTree = instance.render.call(instance.proxy);
         patch(prevSubTree, subTree, container, anchor);
         next.el = subTree.el;
         instance.subTree = subTree;
+        triggerHooks(instance, "u" /* UPDATED */);
       }
     };
     const effect2 = new ReactiveEffect(componentUpdateFn);
@@ -1362,6 +1412,7 @@ function createApp(rootComponent, rootProps) {
   return app;
 }
 export {
+  LifeCycleHooks,
   ReactiveEffect,
   ReactiveFlags,
   Text,
@@ -1381,6 +1432,12 @@ export {
   isVnode,
   nextTick,
   normalizeVnode,
+  onBeforeMount,
+  onBeforeUnmount,
+  onBeforeUpdate,
+  onMounted,
+  onUnmounted,
+  onUpdated,
   proxyRefs,
   queueJob,
   reactive,
@@ -1393,8 +1450,10 @@ export {
   toRef,
   toRefs,
   trackRef,
+  triggerHooks,
   triggerRef,
   unRef,
+  unsetCurrentInstance,
   watch
 };
 //# sourceMappingURL=vue.esm.js.map

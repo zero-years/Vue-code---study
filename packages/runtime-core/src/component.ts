@@ -246,6 +246,6 @@ export function getCurrentInstance() {
 /**
  * 清除组件实例
  */
-function unsetCurrentInstance() {
+export function unsetCurrentInstance() {
   currentInstance = null
 }

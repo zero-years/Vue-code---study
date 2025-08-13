@@ -1,4 +1,8 @@
-import { getCurrentInstance } from './component'
+import {
+  getCurrentInstance,
+  setCurrentInstance,
+  unsetCurrentInstance,
+} from './component'
 
 export enum LifeCycleHooks {
   // 挂载 instance.bm
@@ -37,8 +41,37 @@ function injectHook(target, hook, type) {
     target[type] = []
   }
 
+  // 将 hook 进行包装，确保用户可以在生命周期函数中访问到实例
+  const _hook = () => {
+    // 将当前的实例进行设置，从而使得能够在生命周期中获取到
+    setCurrentInstance(target)
+
+    // 执行生命周期的回调函数
+    hook()
+
+    // 清空实例
+    unsetCurrentInstance
+  }
+
   // 将该生命周期类型中的 回调函数 放置到数组中
-  target[type].push(hook)
+  target[type].push(_hook)
+}
+
+/**
+ * 触发相应的生命周期函数
+ * @param instance 当前的组件实例
+ * @param type 生命周期的类型
+ */
+export function triggerHooks(instance, type) {
+  // 拿到当前需要触发的生命周期类型
+  const hooks = instance[type]
+
+  // 有则依次执行
+  if (hooks) {
+    // getCurrentInstance(instance)
+    hooks.forEach(hook => hook())
+    // unsetCurrentInstance()
+  }
 }
 
 /**
