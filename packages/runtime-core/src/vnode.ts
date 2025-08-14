@@ -116,6 +116,8 @@ export function createVNode(type, props?, children = null) {
     shapeFlag,
     // 绑定 ref
     ref: normalizeRef(props?.ref),
+    // app 中一下会使用到的方法 例如: app.use | provides
+    appContext: null,
   }
 
   // 处理 children 的标准化 和 shapeFlag

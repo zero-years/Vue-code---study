@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   //   h,
+      //   render,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import {
+        h,
+        ref,
+        createApp,
+        getCurrentInstance,
+        onBeforeMount,
+        onMounted,
+        onUpdated,
+        onBeforeUpdate,
+        onBeforeUnmount,
+        onUnmounted,
+        useTemplateRef,
+      } from '../dist/vue.esm.js'
+
+      const Child = {
+        setup(props, { attrs, slots, emit, expose }) {
+          const vm = getCurrentInstance()
+          console.log('parent ==>', vm.parent)
+          console.log('child ==>', vm)
+          expose({
+            a: ref(0),
+            foo() {
+              return '子组件暴露的 foo 方法'
+            },
+          })
+
+          return () => {
+            return h('div', ['我是子组件'])
+          }
+        },
+      }
+
+      const App = {
+        name: 'app',
+        setup() {
+          const childRef = ref()
+          const vm = getCurrentInstance()
+
+          // onMounted(() => {
+          //   document.querySelector('#container')
+          //   console.log(elRef.value)
+          //   console.log(childRef.value.a)
+          //   console.log(vm.proxy.$refs.childRef.a)
+          // })
+
+          const flag = ref(true)
+
+          setTimeout(() => {
+            flag.value = false
+          }, 1000)
+
+          return () => {
+            return h('div', [
+              h('p', { id: 'container', ref: 'elRef' }, '我是父组件的p标签'),
+              flag.value
+                ? h(Child, {
+                    ref: 'childRef',
+                  })
+                : '',
+            ])
+          }
+        },
+      }
+      // const App = {
+      //   setup() {
+      //     const el = useTemplateRef('elRef')
+
+      //     onMounted(() => {
+      //       // document.querySelector('#container')
+      //       // console.log(elRef.value)
+      //       // console.log(childRef.value.a)
+      //       // console.log(vm.proxy.$refs.childRef.a)
+      //       console.log(el.value)
+      //     })
+
+      //     const flag = ref(true)
+
+      //     setTimeout(() => {
+      //       flag.value = false
+      //     }, 1000)
+
+      //     return () => {
+      //       return h('div', [
+      //         h('p', { id: 'container', ref: 'elRef' }, '我是父组件的p标签'),
+      //       ])
+      //     }
+      //   },
+      // }
+
+      const app = createApp(App)
+
+      app.mount('#app')
+    </script>
+  </body>
+</html>

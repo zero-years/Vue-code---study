@@ -2,6 +2,12 @@ import { h } from './h'
 
 export function createAppApi(render) {
   return function createApp(rootComponent, rootProps) {
+    // app.use() provide
+    const context = {
+      // app 往后代组件使用 provide 注入的属性，会存到这里面
+      provides: {},
+    }
+
     const app = {
       _container: null,
 
@@ -13,6 +19,9 @@ export function createAppApi(render) {
 
         // 创建虚拟节点
         const vnode = h(rootComponent, rootProps)
+
+        //  为根组件绑定 appContext
+        vnode.appContext = context
 
         // 将虚拟节点挂载在容器上
         render(vnode, container)
