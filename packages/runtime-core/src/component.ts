@@ -193,6 +193,11 @@ function createSetUpContext(instance) {
     },
     // 处理插槽
     slots: instance.slots,
+    // 暴露属性
+    expose(exposed) {
+      // 把用户暴露的属性放到实例中
+      instance.exposed = exposed
+    },
   }
 }
 
@@ -248,4 +253,64 @@ export function getCurrentInstance() {
  */
 export function unsetCurrentInstance() {
   currentInstance = null
+}
+
+/**
+ * 获取到子组件暴露的属性以及公开的属性
+ * expose 子组件给父组件暴露的方法，父组件可以通过 ref 获取
+ * 如果子组件有通过 expose 暴露内容，那么父组件通过 ref 只能拿到子组件暴露的内容和 $slots | $props | ... 这些内容
+ * 如果用户没用通过 expose 暴露内容，那父组件通过 ref 可以获得 instance.proxy 上的内容
+ * @param instance
+ * @returns
+ */
+export function getComponentPublicInstance(instance) {
+  // 将创建的代理对象进行存储，避免多次创建
+  if (instance.exposedProxy) return instance.exposedProxy
+
+  if (instance.exposed) {
+    // 子组件有暴露，用户可以访问 expose 和 publicPropertiesMap 中的内容
+    instance.exposedProxy = new Proxy(proxyRefs(instance.exposed), {
+      get(target, key) {
+        // 用户访问 expose 里的内容
+        if (key in target) {
+          return target[key]
+        }
+
+        // 用户访问 $el 等内容
+        if (key in publicPropertiesMap) {
+          // $el $props
+          return publicPropertiesMap[key](instance)
+        }
+      },
+    })
+
+    return instance.exposedProxy
+  } else {
+    // 访问实例的 proxy 也就是实例的所有内容
+    return instance.proxy
+  }
+}
+
+// 设置当前在渲染的组件的实例
+let currentRenderInstance = null
+/**
+ * 在渲染当前组件时去获取当前组件的实例
+ * @param instance
+ */
+export function setCurrentRenderingInstance(instance) {
+  currentRenderInstance = instance
+}
+
+/**
+ * 清除当前组件在渲染时的实例
+ */
+export function unsetCurrentRenderingInstance() {
+  currentRenderInstance = null
+}
+
+/**
+ * 获取当前组件在渲染时的实例
+ */
+export function getCurrentRenderingInstance() {
+  return currentRenderInstance
 }

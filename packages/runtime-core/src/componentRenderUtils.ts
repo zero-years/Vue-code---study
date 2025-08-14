@@ -1,3 +1,8 @@
+import {
+  setCurrentRenderingInstance,
+  unsetCurrentRenderingInstance,
+} from './component'
+
 /**
  * 判断新老 props 是否一样，这里的 props 是一个对象
  * @param prevProps
@@ -50,4 +55,17 @@ export function shouldUpdateComponent(n1, n2) {
 
   // 老的有，新的也有，判断 props 是否改变
   return hasPropsChanged(prevProps, nextProps)
+}
+
+export function renderComponentRoot(instance) {
+  // 将当前渲染的组件实例存储起来
+  setCurrentRenderingInstance(instance)
+
+  // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
+  const subTree = instance.render.call(instance.proxy)
+
+  // 清除存储的实例
+  unsetCurrentRenderingInstance()
+
+  return subTree
 }

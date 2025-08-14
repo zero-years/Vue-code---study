@@ -4,10 +4,14 @@ import { isSameVNodeType, normalizeVnode, Text } from './vnode'
 import { createAppApi } from './apiCreateApp'
 import { createComponentInstance, setupComponent } from './component'
 import { queueJob } from './scheduler'
-import { shouldUpdateComponent } from './componentRenderUtils'
+import {
+  renderComponentRoot,
+  shouldUpdateComponent,
+} from './componentRenderUtils'
 import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
 import { triggerHooks, LifeCycleHooks } from './apiLifecycle'
+import { setRef } from './renderTemplateRef'
 
 export function createRenderer(options) {
   /**
@@ -111,7 +115,7 @@ export function createRenderer(options) {
    * @param vnode 要卸载的节点
    */
   const unmount = vnode => {
-    const { shapeFlag, children } = vnode
+    const { shapeFlag, children, ref } = vnode
 
     if (shapeFlag & ShapeFlags.COMPONENT) {
       // 子节点为组件
@@ -123,6 +127,10 @@ export function createRenderer(options) {
 
     // 将当前节点删除掉
     hostRemove(vnode.el)
+
+    if (ref != null) {
+      setRef(ref, null)
+    }
   }
 
   /**
@@ -471,7 +479,7 @@ export function createRenderer(options) {
     /**
      * 文本，元素，组件
      */
-    const { shapeFlag, type } = n2
+    const { shapeFlag, type, ref } = n2
 
     switch (type) {
       case Text:
@@ -485,6 +493,10 @@ export function createRenderer(options) {
           // 组件
           processComponent(n1, n2, container, anchor)
         }
+    }
+
+    if (ref != null) {
+      setRef(ref, n2)
     }
   }
 
@@ -580,13 +592,13 @@ export function createRenderer(options) {
         triggerHooks(instance, LifeCycleHooks.BEFORE_MOUNT)
 
         // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
-        const subTree = render.call(instance.proxy)
-
-        // 共享真实 DOM 元素，组件的 el 会指向 subTree 的 el
-        vnode.el = subTree.el
+        const subTree = renderComponentRoot(instance)
 
         // 将 subTree 挂载到页面中
         patch(null, subTree, container, anchor)
+
+        // 共享真实 DOM 元素，组件的 el 会指向 subTree 的 el
+        vnode.el = subTree.el
 
         // 保存子树
         instance.subTree = subTree
@@ -615,7 +627,7 @@ export function createRenderer(options) {
         const prevSubTree = instance.subTree
 
         // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
-        const subTree = instance.render.call(instance.proxy)
+        const subTree = renderComponentRoot(instance)
 
         // 将 subTree 挂载到页面中
         patch(prevSubTree, subTree, container, anchor)

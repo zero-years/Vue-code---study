@@ -25,17 +25,20 @@
         onBeforeUpdate,
         onBeforeUnmount,
         onUnmounted,
+        useTemplateRef,
       } from '../dist/vue.esm.js'
 
       const Child = {
-        props: ['count'],
         setup(props, { attrs, slots, emit, expose }) {
           /**
            * expose 子组件给父组件暴露的方法，父组件可以通过 ref 获取
+           * 如果子组件有通过 expose 暴露内容，那么父组件通过 ref 只能拿到子组件暴露的内容和 $slots | $props | ... 这些内容
+           * 如果用户没用通过 expose 暴露内容，那父组件通过 ref 可以获得 instance.proxy 上的内容
            */
           expose({
+            a: ref(0),
             foo() {
-              console.log('子组件暴露的 foo 方法')
+              return '子组件暴露的 foo 方法'
             },
           })
 
@@ -47,22 +50,63 @@
 
       const Comp = {
         setup() {
+          const childRef = ref()
+          const vm = getCurrentInstance()
+
+          onMounted(() => {
+            // document.querySelector('#container')
+            // console.log(elRef.value)
+            // console.log(childRef.value.a)
+            console.log(vm.proxy.$refs.childRef.a)
+          })
+
+          const flag = ref(true)
+
+          setTimeout(() => {
+            flag.value = false
+          }, 1000)
+
           return () => {
             return h('div', [
-              h('p', { id: 'one' }, '我是父组件的p标签'),
-              h(Child),
+              h('p', { id: 'container', ref: 'elRef' }, '我是父组件的p标签'),
+              flag.value
+                ? h(Child, {
+                    ref: 'childRef',
+                  })
+                : '',
             ])
           }
         },
       }
+      // const Comp = {
+      //   setup() {
+      //     const el = useTemplateRef('elRef')
+
+      //     onMounted(() => {
+      //       // document.querySelector('#container')
+      //       // console.log(elRef.value)
+      //       // console.log(childRef.value.a)
+      //       // console.log(vm.proxy.$refs.childRef.a)
+      //       console.log(el.value)
+      //     })
+
+      //     const flag = ref(true)
+
+      //     setTimeout(() => {
+      //       flag.value = false
+      //     }, 1000)
+
+      //     return () => {
+      //       return h('div', [
+      //         h('p', { id: 'container', ref: 'elRef' }, '我是父组件的p标签'),
+      //       ])
+      //     }
+      //   },
+      // }
 
       const app = createApp(Comp)
 
       app.mount('#app')
-
-      setTimeout(() => {
-        app.unmount()
-      }, 2000)
     </script>
   </body>
 </html>
