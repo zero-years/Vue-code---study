@@ -1,3 +1,4 @@
+import { ShapeFlags } from '@vue/shared'
 import {
   setCurrentRenderingInstance,
   unsetCurrentRenderingInstance,
@@ -58,14 +59,27 @@ export function shouldUpdateComponent(n1, n2) {
 }
 
 export function renderComponentRoot(instance) {
-  // 将当前渲染的组件实例存储起来
-  setCurrentRenderingInstance(instance)
+  const { vnode } = instance
+  // 有状态的组件
+  if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
+    // 将当前渲染的组件实例存储起来
+    setCurrentRenderingInstance(instance)
 
-  // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
-  const subTree = instance.render.call(instance.proxy)
+    // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
+    const subTree = instance.render.call(instance.proxy)
 
-  // 清除存储的实例
-  unsetCurrentRenderingInstance()
+    // 清除存储的实例
+    unsetCurrentRenderingInstance()
 
-  return subTree
+    return subTree
+  } else {
+    // 函数式组件
+    return vnode.type(instance.props, {
+      get attrs() {
+        return instance.attrs
+      },
+      slots: instance.slots,
+      emit: instance.emit,
+    })
+  }
 }

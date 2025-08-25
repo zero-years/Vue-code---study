@@ -1,4 +1,4 @@
-import { isArray, hasOwn } from '@vue/shared'
+import { isArray, hasOwn, ShapeFlags } from '@vue/shared'
 import { reactive } from '@vue/reactivity'
 
 /**
@@ -6,7 +6,7 @@ import { reactive } from '@vue/reactivity'
  * @param props
  * @returns
  */
-export function normalizePropsOptions(props: {}) {
+export function normalizePropsOptions(props = {}) {
   // 当 props 为数组时，把他转换为对象
   if (isArray(props)) {
     // 把数组转换为对象，值无所谓  ['msg', 'count] => { msg: true, count: true }
@@ -54,12 +54,22 @@ export function initProps(instance) {
  * @param attrs
  */
 function setFullProps(instance, rawProps, props, attrs) {
-  const propsOptions = instance.propsOptions
+  const { propsOptions, vnode } = instance
+  // 是否为函数式组件
+  const isFunctionalComponent =
+    vnode.shapeFlag & ShapeFlags.FUNCTIONAL_COMPONENT
 
+  // propsOptions 的长度大于 0 表示有 props
+  const hasProps = Object.keys(propsOptions).length > 0
   if (rawProps) {
+    /**
+     * 函数式组件
+     * 如果没声明 props ，那所有的属性都放到 props 中  ==> (isFunctionalComponent && !hasProps)
+     * 如果声明了，那就只有声明过的内容放到 props 中，其他放到 attrs 中
+     */
     for (const key in rawProps) {
       const value = rawProps[key]
-      if (hasOwn(propsOptions, key)) {
+      if (hasOwn(propsOptions, key) || (isFunctionalComponent && !hasProps)) {
         // 如果用户声明的 propsOptions 中有当前的 key 值，就放到 props 中
         props[key] = value
       } else {

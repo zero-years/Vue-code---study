@@ -542,7 +542,7 @@ function traverse(value, depth = Infinity, seen = /* @__PURE__ */ new Set()) {
 }
 
 // packages/runtime-core/src/componentProps.ts
-function normalizePropsOptions(props) {
+function normalizePropsOptions(props = {}) {
   if (isArray(props)) {
     return props.reduce((prev, cur) => {
       prev[cur] = {};
@@ -561,11 +561,13 @@ function initProps(instance) {
   instance.attrs = attrs;
 }
 function setFullProps(instance, rawProps, props, attrs) {
-  const propsOptions = instance.propsOptions;
+  const { propsOptions, vnode } = instance;
+  const isFunctionalComponent = vnode.shapeFlag & 2 /* FUNCTIONAL_COMPONENT */;
+  const hasProps = Object.keys(propsOptions).length > 0;
   if (rawProps) {
     for (const key in rawProps) {
       const value = rawProps[key];
-      if (hasOwn(propsOptions, key)) {
+      if (hasOwn(propsOptions, key) || isFunctionalComponent && !hasProps) {
         props[key] = value;
       } else {
         attrs[key] = value;
@@ -838,6 +840,8 @@ function createVNode(type, props, children = null) {
     shapeFlag = 1 /* ELEMENT */;
   } else if (isObject(type)) {
     shapeFlag = 4 /* STATEFUL_COMPONENT */;
+  } else if (isFunction(type)) {
+    shapeFlag = 2 /* FUNCTIONAL_COMPONENT */;
   }
   const vnode = {
     // 证明是一个虚拟节点  vnode
@@ -941,10 +945,21 @@ function shouldUpdateComponent(n1, n2) {
   return hasPropsChanged(prevProps, nextProps);
 }
 function renderComponentRoot(instance) {
-  setCurrentRenderingInstance(instance);
-  const subTree = instance.render.call(instance.proxy);
-  unsetCurrentRenderingInstance();
-  return subTree;
+  const { vnode } = instance;
+  if (vnode.shapeFlag & 4 /* STATEFUL_COMPONENT */) {
+    setCurrentRenderingInstance(instance);
+    const subTree = instance.render.call(instance.proxy);
+    unsetCurrentRenderingInstance();
+    return subTree;
+  } else {
+    return vnode.type(instance.props, {
+      get attrs() {
+        return instance.attrs;
+      },
+      slots: instance.slots,
+      emit: instance.emit
+    });
+  }
 }
 
 // packages/runtime-core/src/apiLifecycle.ts
