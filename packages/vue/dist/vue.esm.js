@@ -651,7 +651,9 @@ function createComponentInstance(vnode, parent) {
     // 子树， render 的返回值
     subTree: null,
     // 组件是否已经挂载
-    isMounted: false
+    isMounted: false,
+    // 当前组件的 provides ，拿取父组件的 provides
+    provides: parent ? parent.provides : appContext.provides
   };
   instance.ctx = { _: instance };
   instance.emit = (event, ...args) => emit(instance, event, ...args);
@@ -890,6 +892,7 @@ function createAppApi(render2) {
       provides: {}
     };
     const app = {
+      context,
       _container: null,
       mount(container) {
         const vnode = h(rootComponent, rootProps);
@@ -900,6 +903,9 @@ function createAppApi(render2) {
       // 卸载虚拟节点
       unmount() {
         render2(null, app._container);
+      },
+      provide(key, value) {
+        context.provides[key] = value;
       }
     };
     return app;
@@ -1388,6 +1394,26 @@ function useTemplateRef(key) {
   return elRef;
 }
 
+// packages/runtime-core/src/apiInject.ts
+function provide(key, value) {
+  const instance = getCurrentInstance();
+  const parentProvides = instance.parent ? instance.parent.provides : instance.appContext.provides;
+  let provides = instance.provides;
+  if (parentProvides === provides) {
+    instance.provides = Object.create(parentProvides);
+    provides = instance.provides;
+  }
+  provides[key] = value;
+}
+function inject(key, defaultValue) {
+  const instance = getCurrentInstance();
+  const parentProvides = instance.parent ? instance.parent.provides : instance.appContext.provides;
+  if (key in parentProvides) {
+    return parentProvides[key];
+  }
+  return defaultValue;
+}
+
 // packages/runtime-dom/src/nodeOps.ts
 var nodeOps = {
   // 插入节点
@@ -1545,6 +1571,7 @@ export {
   getCurrentInstance,
   getCurrentRenderingInstance,
   h,
+  inject,
   isReactive,
   isRef,
   isSameVNodeType,
@@ -1557,6 +1584,7 @@ export {
   onMounted,
   onUnmounted,
   onUpdated,
+  provide,
   proxyRefs,
   queueJob,
   reactive,

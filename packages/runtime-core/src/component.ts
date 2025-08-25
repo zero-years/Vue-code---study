@@ -36,6 +36,8 @@ export function createComponentInstance(vnode, parent) {
     subTree: null,
     // 组件是否已经挂载
     isMounted: false,
+    // 当前组件的 provides ，拿取父组件的 provides
+    provides: parent ? parent.provides : appContext.provides,
   }
 
   instance.ctx = { _: instance }

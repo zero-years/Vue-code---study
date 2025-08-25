@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   //   h,
+      //   render,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import {
+        h,
+        ref,
+        createApp,
+        getCurrentInstance,
+        provide,
+        inject,
+      } from '../dist/vue.esm.js'
+
+      const Child = {
+        setup() {
+          const count = inject('count')
+          const b = inject('b', 'default value')
+          // console.log('count.value ==>', count.value)
+          console.log('a.value ==>', b.value)
+          return () => {
+            return h('div', ['我是子组件', count.value, b.value])
+          }
+        },
+      }
+
+      const App = {
+        name: 'app',
+        setup() {
+          const count = ref(0)
+          provide('count', count)
+          // console.log(getCurrentInstance())
+
+          // const b = inject('b')
+          // console.log('b.value ==>', b.value)
+
+          setTimeout(() => {
+            count.value++
+          }, 1000)
+
+          return () => {
+            return h('div', [
+              h('p', { id: 'container', ref: 'elRef' }, '我是父组件的p标签'),
+              h(Child),
+            ])
+          }
+        },
+      }
+
+      const app = createApp(App)
+      const b = ref('abc')
+      app.provide('b', b)
+      app.mount('#app')
+    </script>
+  </body>
+</html>

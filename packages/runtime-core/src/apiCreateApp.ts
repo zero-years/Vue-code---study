@@ -9,6 +9,7 @@ export function createAppApi(render) {
     }
 
     const app = {
+      context,
       _container: null,
 
       mount(container) {
@@ -33,6 +34,10 @@ export function createAppApi(render) {
       // 卸载虚拟节点
       unmount() {
         render(null, app._container)
+      },
+
+      provide(key, value) {
+        context.provides[key] = value
       },
     }
 
