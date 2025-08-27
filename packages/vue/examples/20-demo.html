@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="container"></div>
+
+    <script type="module">
+      import {
+        h,
+        ref,
+        createApp,
+        getCurrentInstance,
+        provide,
+        inject,
+        Teleport,
+      } from '../dist/vue.esm.js'
+
+      const Child = {
+        setup() {
+          return () => {
+            return h('div', ['我是子组件'])
+          }
+        },
+      }
+
+      const App = {
+        name: 'app',
+        setup() {
+          const count = ref([1, 2])
+          const to = ref('body')
+          const disabled = ref(false)
+
+          // setTimeout(() => {
+          //   // count.value.push(3)
+          //   // to.value = '#container'
+          //   disabled.value = true
+          // }, 1000)
+
+          return () => {
+            return h('div', [
+              h('p', '我是父组件的p标签'),
+              h(
+                Teleport,
+                { to: to.value },
+                count.value.map(item => h('div', item)),
+              ),
+            ])
+          }
+        },
+      }
+
+      const app = createApp(App)
+      app.mount('#app')
+    </script>
+  </body>
+</html>

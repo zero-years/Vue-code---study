@@ -790,6 +790,59 @@ function getCurrentRenderingInstance() {
   return currentRenderInstance;
 }
 
+// packages/runtime-core/src/components/Teleport.ts
+var isTeleport = (type) => type.__isTeleport;
+var Teleport = {
+  name: "Teleport",
+  __isTeleport: true,
+  props: {
+    to: {
+      // 当前 teleport 要挂载到哪个容器上
+      type: String
+    },
+    disabled: {
+      /**
+       * 是否禁用 teleport ，如果禁用则把子节点挂载到 container 上(也就是下方的外部的 div 上s)
+       * h('div', [
+       *     h('p', { id: 'container', ref: 'elRef' }, '我是父组件的p标签'),
+       *     h(
+       *       Teleport,
+       *       { to: 'body', disabled: true },
+       *       h('div', '我是 Teleport 的子节点'),
+       *     ),
+       *   ])
+       */
+      type: Boolean
+    }
+  },
+  process(n1, n2, container, anchor, parentComponent, internals) {
+    const {
+      mountChildren,
+      patchChildren,
+      options: { querySelector, insert }
+    } = internals;
+    const { disabled, to } = n2.props;
+    if (n1 == null) {
+      const target = disabled ? container : querySelector(to);
+      if (target) {
+        n2.target = target;
+        mountChildren(n2.children, target, parentComponent);
+      }
+    } else {
+      patchChildren(n1, n2, n1.target, parentComponent);
+      n2.target = n1.target;
+      const preProps = n1.props;
+      if (preProps.to !== to || preProps.disabled !== disabled) {
+        const target = disabled ? container : querySelector(to);
+        for (const child of n2.children) {
+          insert(child.el, target);
+        }
+        n2.target = target;
+      }
+    }
+  }
+};
+
 // packages/runtime-core/src/vnode.ts
 var Text = Symbol("v-txt");
 function isSameVNodeType(n1, n2) {
@@ -838,6 +891,8 @@ function createVNode(type, props, children = null) {
   let shapeFlag = 0;
   if (isString(type)) {
     shapeFlag = 1 /* ELEMENT */;
+  } else if (isTeleport(type)) {
+    shapeFlag = 64 /* TELEPORT */;
   } else if (isObject(type)) {
     shapeFlag = 4 /* STATEFUL_COMPONENT */;
   } else if (isFunction(type)) {
@@ -991,7 +1046,12 @@ function injectHook(target, hook, type) {
 function triggerHooks(instance, type) {
   const hooks = instance[type];
   if (hooks) {
-    hooks.forEach((hook) => hook());
+    setCurrentInstance(instance);
+    try {
+      hooks.forEach((hook) => hook());
+    } finally {
+      unsetCurrentInstance();
+    }
   }
 }
 var onBeforeMount = createHook("bm" /* BEFORE_MOUNT */);
@@ -1077,6 +1137,9 @@ function createRenderer(options) {
     const { shapeFlag, children, ref: ref2 } = vnode;
     if (shapeFlag & 6 /* COMPONENT */) {
       unmountComponent(vnode.component);
+    } else if (shapeFlag & 64 /* TELEPORT */) {
+      unmountChildren(children);
+      return;
     } else if (shapeFlag & 16 /* ARRAY_CHILDREN */) {
       unmountChildren(children);
     }
@@ -1097,8 +1160,7 @@ function createRenderer(options) {
       }
     }
   };
-  const patchChildren = (n1, n2, parentComponent) => {
-    const el = n2.el;
+  const patchChildren = (n1, n2, el, parentComponent) => {
     const prevShapeFlag = n1.shapeFlag;
     const shapeFlag = n2.shapeFlag;
     if (shapeFlag & 8 /* TEXT_CHILDREN */) {
@@ -1221,7 +1283,7 @@ function createRenderer(options) {
     const oldProps = n1.props;
     const newProps = n2.props;
     patchProps(el, oldProps, newProps);
-    patchChildren(n1, n2, parentComponent);
+    patchChildren(n1, n2, el, parentComponent);
   };
   const patch = (n1, n2, container, anchor = null, parentComponent = null) => {
     if (n1 === n2) {
@@ -1242,6 +1304,12 @@ function createRenderer(options) {
           processElement(n1, n2, container, anchor, parentComponent);
         } else if (shapeFlag & 6 /* COMPONENT */) {
           processComponent(n1, n2, container, anchor, parentComponent);
+        } else if (shapeFlag & 64 /* TELEPORT */) {
+          type.process(n1, n2, container, anchor, parentComponent, {
+            mountChildren,
+            patchChildren,
+            options
+          });
         }
     }
     if (ref2 != null) {
@@ -1573,6 +1641,7 @@ export {
   LifeCycleHooks,
   ReactiveEffect,
   ReactiveFlags,
+  Teleport,
   Text,
   activeSub,
   computed,
@@ -1590,6 +1659,7 @@ export {
   isReactive,
   isRef,
   isSameVNodeType,
+  isTeleport,
   isVnode,
   nextTick,
   normalizeVnode,
