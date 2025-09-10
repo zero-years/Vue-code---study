@@ -12,6 +12,7 @@ import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
 import { triggerHooks, LifeCycleHooks } from './apiLifecycle'
 import { setRef } from './renderTemplateRef'
+import { isKeepAlive } from './components/KeepAlive'
 
 export function createRenderer(options) {
   /**
@@ -116,6 +117,14 @@ export function createRenderer(options) {
    */
   const unmount = vnode => {
     const { shapeFlag, children, ref } = vnode
+
+    // 该组件是 KeepAlive 组件，不需要卸载，但要通知 KeepAlive 该子节点已经停用
+    if (shapeFlag & ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE) {
+      // 此处要通过当前节点的父亲(KeepAlive)，然后去将当前的子节点进行停用
+      const parentComponent = vnode.component.parent
+      parentComponent.ctx.deactivate(vnode)
+      return
+    }
 
     if (shapeFlag & ShapeFlags.COMPONENT) {
       // 子节点为组件
@@ -557,10 +566,17 @@ export function createRenderer(options) {
    * @param container
    * @param anchor
    */
-  const processComponent = (n1, n2, container, anchor, parent) => {
+  const processComponent = (n1, n2, container, anchor, parentComponent) => {
     if (n1 == null) {
+      // 判断该组件是否为 KeepAlive 组件中的被缓存的组件，从而决定是否需要重新挂载
+      if (n2.shapeFlag & ShapeFlags.COMPONENT_KEPT_ALIVE) {
+        // 通知 KeepAlive 复用被缓存的组件
+        parentComponent.ctx.activate(n2, container, anchor)
+        return
+      }
+
       // 挂载与更新，自身中的属性发生变化
-      mountComponent(n2, container, anchor, parent)
+      mountComponent(n2, container, anchor, parentComponent)
     } else {
       // 父组件传递的属性发生变化从而进行更新
       updateComponent(n1, n2)
@@ -692,6 +708,13 @@ export function createRenderer(options) {
      */
     // 创建组件实例
     const instance = createComponentInstance(vnode, parentComponent)
+
+    // 在创建组件实例时，如果该组件是 KeepAlive 则给他一个创建 dom 元素的方法，从而避免在 core 层中操作真实的 dom
+    if (isKeepAlive(vnode.type)) {
+      instance.ctx.render = {
+        options,
+      }
+    }
 
     // 保存实例，方便复用
     vnode.component = instance

@@ -791,7 +791,7 @@ function getCurrentRenderingInstance() {
 }
 
 // packages/runtime-core/src/components/Teleport.ts
-var isTeleport = (type) => type.__isTeleport;
+var isTeleport = (type) => type?.__isTeleport;
 var Teleport = {
   name: "Teleport",
   __isTeleport: true,
@@ -1088,6 +1088,39 @@ function setRef(ref2, vnode) {
   }
 }
 
+// packages/runtime-core/src/components/KeepAlive.ts
+var isKeepAlive = (type) => type?.__isKeepAlive;
+var KeepAlive = {
+  name: "KeepAlive",
+  __isKeepAlive: true,
+  setup(props, { slots }) {
+    const instance = getCurrentInstance();
+    const { options } = instance.ctx.render;
+    const { createElement, insert } = options;
+    const cache = /* @__PURE__ */ new Map();
+    const storageContainer = createElement("div");
+    instance.ctx.deactivate = (vnode) => {
+      insert(vnode.el, storageContainer);
+    };
+    instance.ctx.activate = (vnode, container, anchor) => {
+      insert(vnode.el, container, anchor);
+    };
+    return () => {
+      const vnode = slots.default();
+      const key = vnode.key != null ? vnode.key : vnode.type;
+      const cachedVnode = cache.get(key);
+      if (cachedVnode) {
+        vnode.component = cachedVnode.component;
+        vnode.el = cachedVnode.el;
+        vnode.shapeFlag |= 512 /* COMPONENT_KEPT_ALIVE */;
+      }
+      cache.set(key, vnode);
+      vnode.shapeFlag |= 256 /* COMPONENT_SHOULD_KEEP_ALIVE */;
+      return vnode;
+    };
+  }
+};
+
 // packages/runtime-core/src/renderer.ts
 function createRenderer(options) {
   const {
@@ -1135,6 +1168,11 @@ function createRenderer(options) {
   };
   const unmount = (vnode) => {
     const { shapeFlag, children, ref: ref2 } = vnode;
+    if (shapeFlag & 256 /* COMPONENT_SHOULD_KEEP_ALIVE */) {
+      const parentComponent = vnode.component.parent;
+      parentComponent.ctx.deactivate(vnode);
+      return;
+    }
     if (shapeFlag & 6 /* COMPONENT */) {
       unmountComponent(vnode.component);
     } else if (shapeFlag & 64 /* TELEPORT */) {
@@ -1326,9 +1364,13 @@ function createRenderer(options) {
       instance.vnode = n2;
     }
   };
-  const processComponent = (n1, n2, container, anchor, parent) => {
+  const processComponent = (n1, n2, container, anchor, parentComponent) => {
     if (n1 == null) {
-      mountComponent(n2, container, anchor, parent);
+      if (n2.shapeFlag & 512 /* COMPONENT_KEPT_ALIVE */) {
+        parentComponent.ctx.activate(n2, container, anchor);
+        return;
+      }
+      mountComponent(n2, container, anchor, parentComponent);
     } else {
       updateComponent(n1, n2);
     }
@@ -1376,6 +1418,11 @@ function createRenderer(options) {
   };
   const mountComponent = (vnode, container, anchor, parentComponent) => {
     const instance = createComponentInstance(vnode, parentComponent);
+    if (isKeepAlive(vnode.type)) {
+      instance.ctx.render = {
+        options
+      };
+    }
     vnode.component = instance;
     setupComponent(instance);
     setupRenderEffect(instance, container, anchor);
@@ -1638,6 +1685,7 @@ function createApp(rootComponent, rootProps) {
   return app;
 }
 export {
+  KeepAlive,
   LifeCycleHooks,
   ReactiveEffect,
   ReactiveFlags,
@@ -1656,6 +1704,7 @@ export {
   getCurrentRenderingInstance,
   h,
   inject,
+  isKeepAlive,
   isReactive,
   isRef,
   isSameVNodeType,
