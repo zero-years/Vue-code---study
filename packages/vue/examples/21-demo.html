@@ -57,19 +57,38 @@
         },
       }
 
+      const Com3 = {
+        name: 'com3',
+        setup() {
+          onMounted(() => {
+            console.log('挂载 com3')
+          })
+          onUnmounted(() => {
+            console.log('卸载 com3')
+          })
+          return () => {
+            return h('div', ['我是comp3', h('input')])
+          }
+        },
+      }
+
       const App = {
         name: 'app',
         setup() {
-          const components = [Com1, Com2]
+          const components = [Com1, Com2, Com3]
           const index = ref(0)
           function onClick() {
-            index.value = +!index.value
+            if (index.value < 2) {
+              index.value++
+            } else {
+              index.value = 0
+            }
           }
 
           return () => {
             return h('div', [
               h('button', { onClick }, '切换组件'),
-              h(KeepAlive, null, () => h(components[index.value])),
+              h(KeepAlive, { max: 3 }, () => h(components[index.value])),
               // h('div', null, h(components[index.value])),
             ])
           }

@@ -1093,11 +1093,12 @@ var isKeepAlive = (type) => type?.__isKeepAlive;
 var KeepAlive = {
   name: "KeepAlive",
   __isKeepAlive: true,
+  props: ["max"],
   setup(props, { slots }) {
     const instance = getCurrentInstance();
-    const { options } = instance.ctx.render;
+    const { options, unmount } = instance.ctx.render;
     const { createElement, insert } = options;
-    const cache = /* @__PURE__ */ new Map();
+    const cache = new LRUCache(props.max);
     const storageContainer = createElement("div");
     instance.ctx.deactivate = (vnode) => {
       insert(vnode.el, storageContainer);
@@ -1114,10 +1115,46 @@ var KeepAlive = {
         vnode.el = cachedVnode.el;
         vnode.shapeFlag |= 512 /* COMPONENT_KEPT_ALIVE */;
       }
-      cache.set(key, vnode);
+      const _vnode = cache.set(key, vnode);
+      if (_vnode) {
+        reSetShapleFlag(_vnode);
+        unmount(_vnode);
+      }
       vnode.shapeFlag |= 256 /* COMPONENT_SHOULD_KEEP_ALIVE */;
       return vnode;
     };
+  }
+};
+function reSetShapleFlag(vnode) {
+  vnode.shapeFlag &= ~512 /* COMPONENT_KEPT_ALIVE */;
+  vnode.shapeFlag &= ~256 /* COMPONENT_SHOULD_KEEP_ALIVE */;
+}
+var LRUCache = class {
+  caches = /* @__PURE__ */ new Map();
+  max;
+  constructor(max = Infinity) {
+    this.max = max;
+  }
+  get(key) {
+    if (!this.caches.has(key)) return;
+    const value = this.caches.get(key);
+    this.caches.delete(key);
+    this.caches.set(key, value);
+    return value;
+  }
+  set(key, value) {
+    let vnode;
+    if (this.caches.has(key)) {
+      this.caches.delete(key);
+    } else {
+      if (this.caches.size >= this.max) {
+        const firstKey = this.caches.keys().next().value;
+        vnode = this.caches.get(firstKey);
+        this.caches.delete(firstKey);
+      }
+    }
+    this.caches.set(key, value);
+    return vnode;
   }
 };
 
@@ -1420,7 +1457,8 @@ function createRenderer(options) {
     const instance = createComponentInstance(vnode, parentComponent);
     if (isKeepAlive(vnode.type)) {
       instance.ctx.render = {
-        options
+        options,
+        unmount
       };
     }
     vnode.component = instance;

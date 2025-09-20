@@ -713,6 +713,7 @@ export function createRenderer(options) {
     if (isKeepAlive(vnode.type)) {
       instance.ctx.render = {
         options,
+        unmount,
       }
     }
 
