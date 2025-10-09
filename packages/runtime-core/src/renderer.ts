@@ -58,7 +58,7 @@ export function createRenderer(options) {
      * 3. 挂载它的子节点
      */
 
-    const { type, props, children, shapeFlag } = vnode
+    const { type, props, children, shapeFlag, transition } = vnode
 
     //创建 dom 节点 ,创建 div,span 等
     const el = hostCreateElement(type)
@@ -82,8 +82,18 @@ export function createRenderer(options) {
       mountChildren(children, el, parentComponent)
     }
 
+    // 如果有 transition，则证明是一个过渡组件，需要在元素插入前执行 beforeEnter
+    if (transition) {
+      transition.beforeEnter?.(el)
+    }
+
     // 挂载子节点，把 el 插入 container 中
     hostInsert(el, container, anchor)
+
+    // 如果有 transition，则证明是一个过渡组件，需要在元素插入后执行 Enter
+    if (transition) {
+      transition.enter?.(el)
+    }
   }
 
   /**
@@ -116,7 +126,7 @@ export function createRenderer(options) {
    * @param vnode 要卸载的节点
    */
   const unmount = vnode => {
-    const { shapeFlag, children, ref } = vnode
+    const { shapeFlag, children, ref, transition, el } = vnode
 
     // 该组件是 KeepAlive 组件，不需要卸载，但要通知 KeepAlive 该子节点已经停用
     if (shapeFlag & ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE) {
@@ -138,8 +148,18 @@ export function createRenderer(options) {
       unmountChildren(children)
     }
 
-    // 将当前节点删除掉
-    hostRemove(vnode.el)
+    const remove = () => {
+      // 将当前节点删除掉
+      hostRemove(el)
+    }
+
+    // 在卸载节点前，判断该节点是否为过渡节点，从而决定是否需要触发过渡动画
+    if (transition) {
+      transition.leave?.(el, remove)
+    } else {
+      // 将当前节点删除掉
+      remove()
+    }
 
     if (ref != null) {
       setRef(ref, null)
@@ -485,6 +505,11 @@ export function createRenderer(options) {
       return
     }
 
+    if (n1 && n2 == null) {
+      unmount(n1)
+      return
+    }
+
     /**有几种情况需要触发特殊的更新
      * 1. 节点的类型发生改变  AS: div ==> p
      * 2. 节点的 props 中的 key 发生改变，这种情况一般发生在 v-for 中的 key 值，同时用户也可以自己在节点中增加 key。 const vnode1 = h('div', { style: { color: 'red' }, key: 1 }, 'hello world')
@@ -671,7 +696,7 @@ export function createRenderer(options) {
         patch(prevSubTree, subTree, container, anchor, instance)
 
         // 共享真实 DOM 元素，组件的 el 会指向 subTree 的 el
-        next.el = subTree.el
+        next.el = subTree?.el
 
         // 保存最新的 subTree
         instance.subTree = subTree

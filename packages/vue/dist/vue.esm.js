@@ -1178,7 +1178,7 @@ function createRenderer(options) {
     }
   };
   const mountElement = (vnode, container, anchor = null, parentComponent) => {
-    const { type, props, children, shapeFlag } = vnode;
+    const { type, props, children, shapeFlag, transition } = vnode;
     const el = hostCreateElement(type);
     vnode.el = el;
     if (props) {
@@ -1191,7 +1191,13 @@ function createRenderer(options) {
     } else if (shapeFlag & 16 /* ARRAY_CHILDREN */) {
       mountChildren(children, el, parentComponent);
     }
+    if (transition) {
+      transition.beforeEnter?.(el);
+    }
     hostInsert(el, container, anchor);
+    if (transition) {
+      transition.enter?.(el);
+    }
   };
   const unmountChildren = (children) => {
     for (let i = 0; i < children.length; i++) {
@@ -1204,7 +1210,7 @@ function createRenderer(options) {
     triggerHooks(instance, "um" /* UNMOUNTED */);
   };
   const unmount = (vnode) => {
-    const { shapeFlag, children, ref: ref2 } = vnode;
+    const { shapeFlag, children, ref: ref2, transition, el } = vnode;
     if (shapeFlag & 256 /* COMPONENT_SHOULD_KEEP_ALIVE */) {
       const parentComponent = vnode.component.parent;
       parentComponent.ctx.deactivate(vnode);
@@ -1218,7 +1224,14 @@ function createRenderer(options) {
     } else if (shapeFlag & 16 /* ARRAY_CHILDREN */) {
       unmountChildren(children);
     }
-    hostRemove(vnode.el);
+    const remove = () => {
+      hostRemove(el);
+    };
+    if (transition) {
+      transition.leave?.(el, remove);
+    } else {
+      remove();
+    }
     if (ref2 != null) {
       setRef(ref2, null);
     }
@@ -1364,6 +1377,10 @@ function createRenderer(options) {
     if (n1 === n2) {
       return;
     }
+    if (n1 && n2 == null) {
+      unmount(n1);
+      return;
+    }
     if (n1 && !isSameVNodeType(n1, n2)) {
       anchor = hostNextSibling(n1.el);
       unmount(n1);
@@ -1440,7 +1457,7 @@ function createRenderer(options) {
         const prevSubTree = instance.subTree;
         const subTree = renderComponentRoot(instance);
         patch(prevSubTree, subTree, container, anchor, instance);
-        next.el = subTree.el;
+        next.el = subTree?.el;
         instance.subTree = subTree;
         triggerHooks(instance, "u" /* UPDATED */);
       }
@@ -1581,6 +1598,83 @@ function inject(key, defaultValue) {
   }
   return defaultValue;
 }
+
+// packages/runtime-core/src/components/Transition.ts
+function resolveTransitionProps(props) {
+  const {
+    name = "v",
+    enterFromClass = `${name}-enter-from`,
+    enterActiveClass = `${name}-enter-active`,
+    enterToClass = `${name}-enter-to`,
+    leaveFromClass = `${name}-leave-from`,
+    leaveActiveClass = `${name}-leave-active`,
+    leaveToClass = `${name}-leave-to`,
+    onEnter,
+    onBeforeEnter,
+    onLeave,
+    ...rest
+  } = props;
+  return {
+    ...rest,
+    beforeEnter(el) {
+      el.classList.add(enterFromClass);
+      el.classList.add(enterActiveClass);
+      onBeforeEnter?.(el);
+    },
+    enter(el) {
+      const done = () => {
+        el.classList.remove(enterActiveClass);
+        el.classList.remove(enterToClass);
+      };
+      requestAnimationFrame(() => {
+        el.classList.remove(enterFromClass);
+        el.classList.add(enterToClass);
+      });
+      onEnter?.(el, done);
+      if (!onEnter || onEnter.length < 2) {
+        el.addEventListener("transitionend", done);
+      }
+    },
+    leave(el, remove) {
+      const done = () => {
+        el.classList.remove(leaveActiveClass);
+        el.classList.remove(leaveToClass);
+        remove();
+      };
+      el.classList.add(leaveFromClass);
+      el.classList.add(leaveActiveClass);
+      requestAnimationFrame(() => {
+        el.classList.remove(leaveFromClass);
+        el.classList.add(leaveToClass);
+      });
+      onLeave?.(el, done);
+      if (!onEnter || onEnter.length < 2) {
+        el.addEventListener("transitionend", done);
+      }
+    }
+  };
+}
+function Transition(props, { slots }) {
+  return h(BaseTransition, resolveTransitionProps(props), slots);
+}
+var BaseTransition = {
+  props: ["enter", "leave", "beforeEnter", "appear"],
+  setup(props, { slots }) {
+    const vm = getCurrentInstance();
+    return () => {
+      const vnode = slots.default();
+      if (!vnode) return;
+      if (props.appear || vm.isMounted) {
+        vnode.transition = props;
+      } else {
+        vnode.transition = {
+          leave: props.leave
+        };
+      }
+      return vnode;
+    };
+  }
+};
 
 // packages/runtime-dom/src/nodeOps.ts
 var nodeOps = {
@@ -1729,6 +1823,7 @@ export {
   ReactiveFlags,
   Teleport,
   Text,
+  Transition,
   activeSub,
   computed,
   createApp,

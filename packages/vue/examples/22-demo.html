@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      #app {
+        padding: 100px;
+      }
+
+      .v-enter-active,
+      .v-leave-active {
+        transition: all 0.5s ease;
+      }
+
+      .v-enter-from,
+      .v-leave-to {
+        transform: translateX(50px);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import {
+        h,
+        ref,
+        createApp,
+        getCurrentInstance,
+        provide,
+        inject,
+        Transition,
+      } from '../dist/vue.esm.js'
+
+      const App = {
+        name: 'app',
+        setup() {
+          const show = ref(true)
+          function onClick() {
+            show.value = !show.value
+          }
+
+          return () => {
+            return h('div', [
+              h('button', { onClick }, '切换组件'),
+              h(
+                Transition,
+                {
+                  onBeforeEnter(el) {
+                    console.log('el ==>', el)
+                  },
+                },
+                () => (show.value ? h('p', 'hello') : undefined),
+              ),
+              // h('div', null, h(components[index.value])),
+            ])
+          }
+        },
+      }
+
+      const app = createApp(App)
+      app.mount('#app')
+    </script>
+  </body>
+</html>
