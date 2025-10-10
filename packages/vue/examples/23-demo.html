@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      #app {
+        padding: 100px;
+      }
+
+      .v-enter-active,
+      .v-leave-active {
+        transition: all 0.5s ease;
+      }
+
+      .v-enter-from,
+      .v-leave-to {
+        transform: translateX(50px);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import {
+        h,
+        ref,
+        createApp,
+        defineAsyncComponent,
+      } from '../dist/vue.esm.js'
+
+      const App = {
+        name: 'app',
+        setup() {
+          // 基础案例
+          // const component = defineAsyncComponent(() => {
+          //   // 加载异步组件
+          //   return new Promise(resolve => {
+          //     setTimeout(() => {
+          //       resolve({
+          //         render() {
+          //           return h('div', 'asyncComponent')
+          //         },
+          //       })
+          //     }, 2000)
+          //   })
+          // })
+
+          // 加载未完成前的显示
+          const component = defineAsyncComponent({
+            loader: () => {
+              // 加载异步组件
+              return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                  resolve({
+                    props: ['msg'],
+
+                    setup(props) {
+                      return () => {
+                        return h('div', `${props.msg} vue3`)
+                      }
+                    },
+                  })
+                  // reject('加载失败')
+                }, 2000)
+              })
+            },
+            loadingComponent: {
+              render() {
+                return h('div', 'loading....')
+              },
+            },
+            errorComponent: {
+              render() {
+                return h('div', '组件加载失败')
+              },
+            },
+            timeout: 5000,
+          })
+
+          return () => {
+            return h(component, { msg: 'hello' })
+          }
+        },
+      }
+
+      const app = createApp(App)
+      app.mount('#app')
+    </script>
+  </body>
+</html>

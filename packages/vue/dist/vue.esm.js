@@ -1599,6 +1599,55 @@ function inject(key, defaultValue) {
   return defaultValue;
 }
 
+// packages/runtime-core/src/apiAsyncComponent.ts
+function defineAsyncComponent(options) {
+  if (isFunction(options)) {
+    options = {
+      loader: options
+    };
+  }
+  const defaultComponent = () => h("span", null, "");
+  const {
+    loader,
+    loadingComponent = defaultComponent,
+    errorComponent = defaultComponent,
+    timeout
+  } = options;
+  return {
+    setup(props, { attrs, slots }) {
+      const component = ref(() => {
+        return h(loadingComponent);
+      });
+      function loadComponent() {
+        return new Promise((resolve, reject) => {
+          if (timeout && timeout > 0) {
+            setTimeout(() => {
+              reject("\u8D85\u65F6");
+            }, timeout);
+          }
+          loader().then(resolve, reject);
+        });
+      }
+      loadComponent().then(
+        (comp) => {
+          console.log("comp ==>", comp);
+          if (comp && comp[Symbol.toStringTag] === "Module") {
+            comp = comp.default;
+          }
+          component.value = comp;
+        },
+        (err) => {
+          console.log(err);
+          component.value = errorComponent;
+        }
+      );
+      return () => {
+        return h(component.value, { ...props, ...attrs }, slots);
+      };
+    }
+  };
+}
+
 // packages/runtime-core/src/components/Transition.ts
 function resolveTransitionProps(props) {
   const {
@@ -1831,6 +1880,7 @@ export {
   createReactiveObject,
   createRenderer,
   createVNode,
+  defineAsyncComponent,
   effect,
   getComponentPublicInstance,
   getCurrentInstance,
