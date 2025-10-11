@@ -1,6 +1,6 @@
-import { ShapeFlags } from '@vue/shared'
+import { PatchFlags, ShapeFlags } from '@vue/shared'
 import { ReactiveEffect } from '@vue/reactivity'
-import { isSameVNodeType, normalizeVnode, Text } from './vnode'
+import { Fragment, isSameVNodeType, normalizeVnode, Text } from './vnode'
 import { createAppApi } from './apiCreateApp'
 import { createComponentInstance, setupComponent } from './component'
 import { queueJob } from './scheduler'
@@ -126,7 +126,7 @@ export function createRenderer(options) {
    * @param vnode 要卸载的节点
    */
   const unmount = vnode => {
-    const { shapeFlag, children, ref, transition, el } = vnode
+    const { shapeFlag, children, ref, transition, el, type } = vnode
 
     // 该组件是 KeepAlive 组件，不需要卸载，但要通知 KeepAlive 该子节点已经停用
     if (shapeFlag & ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE) {
@@ -136,6 +136,11 @@ export function createRenderer(options) {
       return
     }
 
+    // 卸载 Fragment
+    if (type == Fragment) {
+      unmountChildren(children)
+      return
+    }
     if (shapeFlag & ShapeFlags.COMPONENT) {
       // 子节点为组件
       unmountComponent(vnode.component)
@@ -150,7 +155,7 @@ export function createRenderer(options) {
 
     const remove = () => {
       // 将当前节点删除掉
-      hostRemove(el)
+      vnode.el && hostRemove(el)
     }
 
     // 在卸载节点前，判断该节点是否为过渡节点，从而决定是否需要触发过渡动画
@@ -483,13 +488,56 @@ export function createRenderer(options) {
     // 复用 dom 元素，每次进来都将上一次的 el ，保存到最近的节点上，从而实现复用
     const el = (n2.el = n1.el)
 
+    const { patchFlag } = n2
+
     // 更新
     const oldProps = n1.props
     const newProps = n2.props
-    patchProps(el, oldProps, newProps)
+
+    // 如果 patchFlag 大于 0 证明该节点没有特定的更新标记，则需要将整个节点进行对比更新
+    if (patchFlag > 0) {
+      debugger
+      // 如果有，则利用 或与运算 判断需要对那些内容进行对比
+
+      // 节点需要对比的是样式名
+      if (patchFlag & PatchFlags.CLASS) {
+        hostPatchProp(el, 'class', oldProps?.class, newProps.class)
+      }
+
+      // 节点需要对比的是样式
+      if (patchFlag & PatchFlags.STYLE) {
+        hostPatchProp(el, 'style', oldProps?.style, newProps.style)
+      }
+
+      // 节点需要对比的是动态文本
+      if (patchFlag & PatchFlags.TEXT) {
+        if (n1.children !== n2.children) {
+          hostSetElementText(el, n2.children)
+        }
+        return
+      }
+    } else {
+      patchProps(el, oldProps, newProps)
+    }
 
     // 更新 children
     patchChildren(n1, n2, el, parentComponent)
+  }
+
+  /**
+   * 当节点为 Fragment 进行渲染更新
+   * @param n1
+   * @param n2
+   * @param container
+   */
+  const processFragment = (n1, n2, container, parentComponent) => {
+    // 挂载 Fragment
+    if (n1 == null) {
+      mountChildren(n2.children, container, parentComponent)
+    } else {
+      // 更新
+      patchChildren(n1, n2, container, parentComponent)
+    }
   }
 
   /**
@@ -533,6 +581,9 @@ export function createRenderer(options) {
     switch (type) {
       case Text:
         processText(n1, n2, container, anchor)
+        break
+      case Fragment:
+        processFragment(n1, n2, container, parentComponent)
         break
       default:
         if (shapeFlag & ShapeFlags.ELEMENT) {

@@ -14,6 +14,8 @@ import { isTeleport } from './components/Teleport'
  */
 export const Text = Symbol('v-txt')
 
+export const Fragment = Symbol('Fragment')
+
 export function isSameVNodeType(n1, n2) {
   return n1.type === n2.type && n1.key === n2.key
 }
@@ -90,8 +92,9 @@ function normalizeRef(ref) {
  * @param type 节点的类型
  * @param props 节点携带的属性
  * @param children 节点的子级
+ * @param patchFlag 更新标记，会根据该节点的更新标记，来更新对应的内容，从而减少对静态内容的更新对比
  */
-export function createVNode(type, props?, children = null) {
+export function createVNode(type, props?, children = null, patchFlag = 0) {
   let shapeFlag = 0
 
   // 处理 type 的 shapeFlag
@@ -125,6 +128,8 @@ export function createVNode(type, props?, children = null) {
     ref: normalizeRef(props?.ref),
     // app 中一下会使用到的方法 例如: app.use | provides
     appContext: null,
+    // 更新的标记，更新时会根据这个对节点的特点内容进行对比更新，而不是全部，从而减少对比带来的性能问题
+    patchFlag,
   }
 
   // 处理 children 的标准化 和 shapeFlag

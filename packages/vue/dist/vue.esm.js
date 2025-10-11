@@ -845,6 +845,7 @@ var Teleport = {
 
 // packages/runtime-core/src/vnode.ts
 var Text = Symbol("v-txt");
+var Fragment = Symbol("Fragment");
 function isSameVNodeType(n1, n2) {
   return n1.type === n2.type && n1.key === n2.key;
 }
@@ -887,7 +888,7 @@ function normalizeRef(ref2) {
     i: getCurrentRenderingInstance()
   };
 }
-function createVNode(type, props, children = null) {
+function createVNode(type, props, children = null, patchFlag = 0) {
   let shapeFlag = 0;
   if (isString(type)) {
     shapeFlag = 1 /* ELEMENT */;
@@ -913,7 +914,9 @@ function createVNode(type, props, children = null) {
     // 绑定 ref
     ref: normalizeRef(props?.ref),
     // app 中一下会使用到的方法 例如: app.use | provides
-    appContext: null
+    appContext: null,
+    // 更新的标记，更新时会根据这个对节点的特点内容进行对比更新，而不是全部，从而减少对比带来的性能问题
+    patchFlag
   };
   normalizeChildren(vnode, children);
   return vnode;
@@ -1210,10 +1213,14 @@ function createRenderer(options) {
     triggerHooks(instance, "um" /* UNMOUNTED */);
   };
   const unmount = (vnode) => {
-    const { shapeFlag, children, ref: ref2, transition, el } = vnode;
+    const { shapeFlag, children, ref: ref2, transition, el, type } = vnode;
     if (shapeFlag & 256 /* COMPONENT_SHOULD_KEEP_ALIVE */) {
       const parentComponent = vnode.component.parent;
       parentComponent.ctx.deactivate(vnode);
+      return;
+    }
+    if (type == Fragment) {
+      unmountChildren(children);
       return;
     }
     if (shapeFlag & 6 /* COMPONENT */) {
@@ -1225,7 +1232,7 @@ function createRenderer(options) {
       unmountChildren(children);
     }
     const remove = () => {
-      hostRemove(el);
+      vnode.el && hostRemove(el);
     };
     if (transition) {
       transition.leave?.(el, remove);
@@ -1368,10 +1375,34 @@ function createRenderer(options) {
   };
   const patchElement = (n1, n2, parentComponent) => {
     const el = n2.el = n1.el;
+    const { patchFlag } = n2;
     const oldProps = n1.props;
     const newProps = n2.props;
-    patchProps(el, oldProps, newProps);
+    if (patchFlag > 0) {
+      debugger;
+      if (patchFlag & 2 /* CLASS */) {
+        hostPatchProp(el, "class", oldProps?.class, newProps.class);
+      }
+      if (patchFlag & 4 /* STYLE */) {
+        hostPatchProp(el, "style", oldProps?.style, newProps.style);
+      }
+      if (patchFlag & 1 /* TEXT */) {
+        if (n1.children !== n2.children) {
+          hostSetElementText(el, n2.children);
+        }
+        return;
+      }
+    } else {
+      patchProps(el, oldProps, newProps);
+    }
     patchChildren(n1, n2, el, parentComponent);
+  };
+  const processFragment = (n1, n2, container, parentComponent) => {
+    if (n1 == null) {
+      mountChildren(n2.children, container, parentComponent);
+    } else {
+      patchChildren(n1, n2, container, parentComponent);
+    }
   };
   const patch = (n1, n2, container, anchor = null, parentComponent = null) => {
     if (n1 === n2) {
@@ -1390,6 +1421,9 @@ function createRenderer(options) {
     switch (type) {
       case Text:
         processText(n1, n2, container, anchor);
+        break;
+      case Fragment:
+        processFragment(n1, n2, container, parentComponent);
         break;
       default:
         if (shapeFlag & 1 /* ELEMENT */) {
@@ -1866,6 +1900,7 @@ function createApp(rootComponent, rootProps) {
   return app;
 }
 export {
+  Fragment,
   KeepAlive,
   LifeCycleHooks,
   ReactiveEffect,

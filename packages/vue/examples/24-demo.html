@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      #app {
+        padding: 100px;
+      }
+
+      .v-enter-active,
+      .v-leave-active {
+        transition: all 0.5s ease;
+      }
+
+      .v-enter-from,
+      .v-leave-to {
+        transform: translateX(50px);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import { h, ref, createApp, Fragment } from '../dist/vue.esm.js'
+
+      const App = {
+        name: 'app',
+        setup() {
+          const age = ref(18)
+
+          setTimeout(() => {
+            age.value++
+          }, 1000)
+
+          return () => {
+            // vue3 中组件可以拥有多个根节点 而 vue2 中不行
+            // 而 vue3 中的多个根节点是通过 fragment 进行实现的
+            return h(Fragment, null, [
+              h('div', '姓名: 张三'),
+              h('div', `年龄: ${age.value}`),
+            ])
+          }
+        },
+      }
+
+      const app = createApp(App)
+      app.mount('#app')
+
+      setTimeout(() => {
+        app.unmount()
+      }, 2000)
+    </script>
+  </body>
+</html>
