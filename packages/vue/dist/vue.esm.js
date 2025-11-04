@@ -888,7 +888,7 @@ function normalizeRef(ref2) {
     i: getCurrentRenderingInstance()
   };
 }
-function createVNode(type, props, children = null, patchFlag = 0) {
+function createVNode(type, props, children = null, patchFlag = 0, isBlock = false) {
   let shapeFlag = 0;
   if (isString(type)) {
     shapeFlag = 1 /* ELEMENT */;
@@ -909,6 +909,8 @@ function createVNode(type, props, children = null, patchFlag = 0) {
     key: props?.key,
     // 虚拟节点要挂载的元素
     el: null,
+    // 当前节点中的动态节点(需要进行 patch 对比的节点)
+    dynamicChildren: null,
     // 如果是 9 则表示 type 是一个 dom 元素, children 是一个字符串
     shapeFlag,
     // 绑定 ref
@@ -918,7 +920,32 @@ function createVNode(type, props, children = null, patchFlag = 0) {
     // 更新的标记，更新时会根据这个对节点的特点内容进行对比更新，而不是全部，从而减少对比带来的性能问题
     patchFlag
   };
+  if (patchFlag > 0 && currentBlock && !isBlock) {
+    currentBlock.push(vnode);
+  }
   normalizeChildren(vnode, children);
+  return vnode;
+}
+var blockStack = [];
+var currentBlock = null;
+function openBlock() {
+  currentBlock = [];
+  blockStack.push(currentBlock);
+}
+function closeBlock() {
+  blockStack.pop();
+  currentBlock = blockStack.at(-1);
+}
+function setupBlock(vnode) {
+  vnode.dynamicChildren = currentBlock;
+  closeBlock();
+  if (currentBlock) {
+    currentBlock.push(vnode);
+  }
+}
+function createElementBlock(type, props, children, patchFlag) {
+  const vnode = createVNode(type, props, children, patchFlag, true);
+  setupBlock(vnode);
   return vnode;
 }
 
@@ -1375,11 +1402,10 @@ function createRenderer(options) {
   };
   const patchElement = (n1, n2, parentComponent) => {
     const el = n2.el = n1.el;
-    const { patchFlag } = n2;
+    const { patchFlag, dynamicChildren } = n2;
     const oldProps = n1.props;
     const newProps = n2.props;
     if (patchFlag > 0) {
-      debugger;
       if (patchFlag & 2 /* CLASS */) {
         hostPatchProp(el, "class", oldProps?.class, newProps.class);
       }
@@ -1395,7 +1421,21 @@ function createRenderer(options) {
     } else {
       patchProps(el, oldProps, newProps);
     }
-    patchChildren(n1, n2, el, parentComponent);
+    if (dynamicChildren && n1.dynamicChildren) {
+      patchBlockChildren(
+        n1.dynamicChildren,
+        dynamicChildren,
+        el,
+        parentComponent
+      );
+    } else {
+      patchChildren(n1, n2, el, parentComponent);
+    }
+  };
+  const patchBlockChildren = (c1, c2, container, parentComponent) => {
+    for (let i = 0; i < c2.length; i++) {
+      patch(c1[i], c2[i], container, null, parentComponent);
+    }
   };
   const processFragment = (n1, n2, container, parentComponent) => {
     if (n1 == null) {
@@ -1912,6 +1952,7 @@ export {
   computed,
   createApp,
   createComponentInstance,
+  createElementBlock,
   createReactiveObject,
   createRenderer,
   createVNode,
@@ -1936,6 +1977,7 @@ export {
   onMounted,
   onUnmounted,
   onUpdated,
+  openBlock,
   provide,
   proxyRefs,
   queueJob,

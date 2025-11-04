@@ -488,7 +488,7 @@ export function createRenderer(options) {
     // 复用 dom 元素，每次进来都将上一次的 el ，保存到最近的节点上，从而实现复用
     const el = (n2.el = n1.el)
 
-    const { patchFlag } = n2
+    const { patchFlag, dynamicChildren } = n2
 
     // 更新
     const oldProps = n1.props
@@ -496,7 +496,6 @@ export function createRenderer(options) {
 
     // 如果 patchFlag 大于 0 证明该节点没有特定的更新标记，则需要将整个节点进行对比更新
     if (patchFlag > 0) {
-      debugger
       // 如果有，则利用 或与运算 判断需要对那些内容进行对比
 
       // 节点需要对比的是样式名
@@ -520,8 +519,24 @@ export function createRenderer(options) {
       patchProps(el, oldProps, newProps)
     }
 
-    // 更新 children
-    patchChildren(n1, n2, el, parentComponent)
+    if (dynamicChildren && n1.dynamicChildren) {
+      // 只需要更新动态节点
+      patchBlockChildren(
+        n1.dynamicChildren,
+        dynamicChildren,
+        el,
+        parentComponent,
+      )
+    } else {
+      // 更新 children， 全量 diff
+      patchChildren(n1, n2, el, parentComponent)
+    }
+  }
+
+  const patchBlockChildren = (c1, c2, container, parentComponent) => {
+    for (let i = 0; i < c2.length; i++) {
+      patch(c1[i], c2[i], container, null, parentComponent)
+    }
   }
 
   /**
