@@ -948,6 +948,20 @@ function createElementBlock(type, props, children, patchFlag) {
   setupBlock(vnode);
   return vnode;
 }
+function renderList(list, cb) {
+  return list.map(cb);
+}
+function toDisplayString(val) {
+  if (isString(val)) return val;
+  if (val == null) return "";
+  if (isRef(val)) {
+    return val.value;
+  }
+  if (typeof val == "object") {
+    return JSON.stringify(val);
+  }
+  return String(val);
+}
 
 // packages/runtime-core/src/h.ts
 function h(type, propsOrChildren, children) {
@@ -1438,9 +1452,19 @@ function createRenderer(options) {
     }
   };
   const processFragment = (n1, n2, container, parentComponent) => {
+    const { patchFlag } = n2;
     if (n1 == null) {
       mountChildren(n2.children, container, parentComponent);
     } else {
+      if (patchFlag & 64 /* STABLE_FRAGMENT */) {
+        patchBlockChildren(
+          n1.dynamicChildren,
+          n2.dynamicChildren,
+          container,
+          parentComponent
+        );
+        return;
+      }
       patchChildren(n1, n2, container, parentComponent);
     }
   };
@@ -1984,11 +2008,13 @@ export {
   reactive,
   ref,
   render,
+  renderList,
   renderOptions,
   setActiveSub,
   setCurrentInstance,
   setCurrentRenderingInstance,
   setupComponent,
+  toDisplayString,
   toRef,
   toRefs,
   trackRef,

@@ -546,10 +546,22 @@ export function createRenderer(options) {
    * @param container
    */
   const processFragment = (n1, n2, container, parentComponent) => {
+    const { patchFlag } = n2
     // 挂载 Fragment
     if (n1 == null) {
       mountChildren(n2.children, container, parentComponent)
     } else {
+      if (patchFlag & PatchFlags.STABLE_FRAGMENT) {
+        // 是一个稳定的序列(不会改变)，走动态子节点更新
+        patchBlockChildren(
+          n1.dynamicChildren,
+          n2.dynamicChildren,
+          container,
+          parentComponent,
+        )
+        return
+      }
+
       // 更新
       patchChildren(n1, n2, container, parentComponent)
     }
@@ -592,7 +604,6 @@ export function createRenderer(options) {
      * 文本，元素，组件
      */
     const { shapeFlag, type, ref } = n2
-
     switch (type) {
       case Text:
         processText(n1, n2, container, anchor)
