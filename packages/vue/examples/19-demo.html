@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import { h, ref, createApp, getCurrentInstance } from '../dist/vue.esm.js'
+
+      /**
+       * 函数式组件
+       * 如果没声明 props ，那所有的属性都放到 props 中
+       * 如果声明了，那就只有声明过的内容放到 props 中，其他放到 attrs 中
+       * 函数式组件中不存在 expose
+       */
+      function App(props, { emit }) {
+        setTimeout(() => {
+          emit('foo')
+        }, 1000)
+        console.log(props)
+
+        return h('div', props.msg)
+      }
+
+      App.props = ['msg']
+      const app = createApp(App, {
+        msg: 'hello world',
+        count: 0,
+        onFoo() {
+          console.log('foo')
+        },
+      })
+      app.mount('#app')
+    </script>
+  </body>
+</html>

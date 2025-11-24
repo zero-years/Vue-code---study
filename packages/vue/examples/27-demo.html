@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      #app {
+        padding: 100px;
+      }
+
+      .v-enter-active,
+      .v-leave-active {
+        transition: all 0.5s ease;
+      }
+
+      .v-enter-from,
+      .v-leave-to {
+        transform: translateX(50px);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import {
+        ref,
+        createApp,
+        createVNode,
+        openBlock,
+        createElementBlock,
+        Fragment,
+        renderList,
+        toDisplayString,
+      } from '../dist/vue.esm.js'
+
+      const App = {
+        setup() {
+          const list = ref(['a', 'b', 'c'])
+          setTimeout(() => {
+            list.value = ['b', 'a']
+          }, 2000)
+
+          return () => {
+            openBlock()
+            const vnode = createElementBlock('div', null, [
+              (openBlock(),
+              createElementBlock(
+                Fragment,
+                null,
+                renderList(list.value, item => {
+                  return (
+                    openBlock(),
+                    createElementBlock(
+                      'div',
+                      { key: item },
+                      toDisplayString(item),
+                      1,
+                    )
+                  )
+                }),
+                128,
+              )),
+            ])
+
+            // const vnode = createElementBlock(
+            //   'div',
+            //   null,
+            //   list.value.map(item => {
+            //     return createVNode('div', { key: item }, item, 1)
+            //   }),
+            // )
+            return vnode
+          }
+        },
+      }
+
+      const app = createApp(App)
+      app.mount('#app')
+    </script>
+  </body>
+</html>

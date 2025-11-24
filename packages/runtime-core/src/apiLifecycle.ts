@@ -69,8 +69,12 @@ export function triggerHooks(instance, type) {
   // 有则依次执行
   if (hooks) {
     // getCurrentInstance(instance)
-    hooks.forEach(hook => hook())
-    // unsetCurrentInstance()
+    setCurrentInstance(instance)
+    try {
+      hooks.forEach(hook => hook())
+    } finally {
+      unsetCurrentInstance()
+    }
   }
 }
 

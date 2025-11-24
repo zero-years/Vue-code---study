@@ -1,13 +1,18 @@
-import { ShapeFlags } from '@vue/shared'
+import { PatchFlags, ShapeFlags } from '@vue/shared'
 import { ReactiveEffect } from '@vue/reactivity'
-import { isSameVNodeType, normalizeVnode, Text } from './vnode'
+import { Fragment, isSameVNodeType, normalizeVnode, Text } from './vnode'
 import { createAppApi } from './apiCreateApp'
 import { createComponentInstance, setupComponent } from './component'
 import { queueJob } from './scheduler'
-import { shouldUpdateComponent } from './componentRenderUtils'
+import {
+  renderComponentRoot,
+  shouldUpdateComponent,
+} from './componentRenderUtils'
 import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
 import { triggerHooks, LifeCycleHooks } from './apiLifecycle'
+import { setRef } from './renderTemplateRef'
+import { isKeepAlive } from './components/KeepAlive'
 
 export function createRenderer(options) {
   /**
@@ -31,13 +36,13 @@ export function createRenderer(options) {
    * @param children
    * @param el
    */
-  const mountChildren = (children, el) => {
+  const mountChildren = (children, el, parentComponent) => {
     for (let i = 0; i < children.length; i++) {
       // 如果 children 为字符串则将它转换为对象
       const child = (children[i] = normalizeVnode(children[i]))
 
       // 通过递归去挂载子节点
-      patch(null, child, el)
+      patch(null, child, el, null, parentComponent)
     }
   }
 
@@ -46,14 +51,14 @@ export function createRenderer(options) {
    * @param vnode 要挂载的节点
    * @param container 挂载的容器
    */
-  const mountElement = (vnode, container, anchor = null) => {
+  const mountElement = (vnode, container, anchor = null, parentComponent) => {
     /**
      * 1. 创建 dom 节点
      * 2. 设置它的 props
      * 3. 挂载它的子节点
      */
 
-    const { type, props, children, shapeFlag } = vnode
+    const { type, props, children, shapeFlag, transition } = vnode
 
     //创建 dom 节点 ,创建 div,span 等
     const el = hostCreateElement(type)
@@ -74,11 +79,21 @@ export function createRenderer(options) {
       hostSetElementText(el, children)
     } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       // 子节点是数组
-      mountChildren(children, el)
+      mountChildren(children, el, parentComponent)
+    }
+
+    // 如果有 transition，则证明是一个过渡组件，需要在元素插入前执行 beforeEnter
+    if (transition) {
+      transition.beforeEnter?.(el)
     }
 
     // 挂载子节点，把 el 插入 container 中
     hostInsert(el, container, anchor)
+
+    // 如果有 transition，则证明是一个过渡组件，需要在元素插入后执行 Enter
+    if (transition) {
+      transition.enter?.(el)
+    }
   }
 
   /**
@@ -111,18 +126,49 @@ export function createRenderer(options) {
    * @param vnode 要卸载的节点
    */
   const unmount = vnode => {
-    const { shapeFlag, children } = vnode
+    const { shapeFlag, children, ref, transition, el, type } = vnode
 
+    // 该组件是 KeepAlive 组件，不需要卸载，但要通知 KeepAlive 该子节点已经停用
+    if (shapeFlag & ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE) {
+      // 此处要通过当前节点的父亲(KeepAlive)，然后去将当前的子节点进行停用
+      const parentComponent = vnode.component.parent
+      parentComponent.ctx.deactivate(vnode)
+      return
+    }
+
+    // 卸载 Fragment
+    if (type == Fragment) {
+      unmountChildren(children)
+      return
+    }
     if (shapeFlag & ShapeFlags.COMPONENT) {
       // 子节点为组件
       unmountComponent(vnode.component)
+    } else if (shapeFlag & ShapeFlags.TELEPORT) {
+      // teleport 卸载，就是卸载它的子节点
+      unmountChildren(children)
+      return
     } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       // 子节点为数组，需要递归卸载
       unmountChildren(children)
     }
 
-    // 将当前节点删除掉
-    hostRemove(vnode.el)
+    const remove = () => {
+      // 将当前节点删除掉
+      vnode.el && hostRemove(el)
+    }
+
+    // 在卸载节点前，判断该节点是否为过渡节点，从而决定是否需要触发过渡动画
+    if (transition) {
+      transition.leave?.(el, remove)
+    } else {
+      // 将当前节点删除掉
+      remove()
+    }
+
+    if (ref != null) {
+      setRef(ref, null)
+    }
   }
 
   /**
@@ -155,8 +201,7 @@ export function createRenderer(options) {
    * @param n1
    * @param n2
    */
-  const patchChildren = (n1, n2) => {
-    const el = n2.el
+  const patchChildren = (n1, n2, el, parentComponent) => {
     /**
      * 1. n2 的子节点素为文本
      *  - 1.1 老的子节点是数组，新的是文本
@@ -190,7 +235,7 @@ export function createRenderer(options) {
 
         if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
           // 挂载新的节点
-          mountChildren(n2.children, el)
+          mountChildren(n2.children, el, parentComponent)
         }
       } else {
         // 老的是 数组 或者 null
@@ -199,7 +244,7 @@ export function createRenderer(options) {
           // 老的是数组
           if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
             // 新的是数组，老的也是数组，全量 diff
-            patchKeyedChildren(n1.children, n2.children, el)
+            patchKeyedChildren(n1.children, n2.children, el, parentComponent)
           } else {
             // 新的是 null，卸载老的 数组
             unmountChildren(n1.children)
@@ -208,14 +253,14 @@ export function createRenderer(options) {
           // 老的是 null
           if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
             // 新的是数组，挂载新的
-            mountChildren(n2.children, el)
+            mountChildren(n2.children, el, parentComponent)
           }
         }
       }
     }
   }
 
-  const patchKeyedChildren = (c1, c2, container) => {
+  const patchKeyedChildren = (c1, c2, container, parentComponent) => {
     /**
      * 全量 DIFF
      * 1. 双端 diff
@@ -265,7 +310,7 @@ export function createRenderer(options) {
 
       if (isSameVNodeType(n1, n2)) {
         // n1 与 n2 是同一个子节点，则可以更新，更新完后继续对比下一个元素
-        patch(n1, n2, container)
+        patch(n1, n2, container, null, parentComponent)
       } else {
         break
       }
@@ -287,7 +332,7 @@ export function createRenderer(options) {
 
       if (isSameVNodeType(n1, n2)) {
         // n1 与 n2 是同一个子节点，则可以更新，更新完后继续对比上一个元素
-        patch(n1, n2, container)
+        patch(n1, n2, container, null, parentComponent)
       } else {
         break
       }
@@ -305,7 +350,13 @@ export function createRenderer(options) {
 
       // 新的内容的范围是 i - e2
       while (i <= e2) {
-        patch(null, (c2[i] = normalizeVnode(c2[i])), container, anchor)
+        patch(
+          null,
+          (c2[i] = normalizeVnode(c2[i])),
+          container,
+          anchor,
+          parentComponent,
+        )
         i++
       }
     } else if (i > e2) {
@@ -377,7 +428,9 @@ export function createRenderer(options) {
             move = true
           }
           newIndexToOldIndexMap[newIndex] = j
-          patch(n1, c2[newIndex], container)
+
+          // patch 更新
+          patch(n1, c2[newIndex], container, null, parentComponent)
         } else {
           // 如果没有则表示老的有，新的没有，需要卸载该元素
           unmount(n1)
@@ -414,7 +467,7 @@ export function createRenderer(options) {
           }
         } else {
           // 该元素是个新元素
-          patch(null, n2, container, anchor)
+          patch(null, n2, container, anchor, parentComponent)
         }
       }
     }
@@ -425,7 +478,7 @@ export function createRenderer(options) {
    * @param n1 旧节点
    * @param n2 新节点
    */
-  const patchElement = (n1, n2) => {
+  const patchElement = (n1, n2, parentComponent) => {
     /**
      * 1. 复用 dom 元素
      * 2. 更新 props
@@ -435,13 +488,83 @@ export function createRenderer(options) {
     // 复用 dom 元素，每次进来都将上一次的 el ，保存到最近的节点上，从而实现复用
     const el = (n2.el = n1.el)
 
+    const { patchFlag, dynamicChildren } = n2
+
     // 更新
     const oldProps = n1.props
     const newProps = n2.props
-    patchProps(el, oldProps, newProps)
 
-    // 更新 children
-    patchChildren(n1, n2)
+    // 如果 patchFlag 大于 0 证明该节点没有特定的更新标记，则需要将整个节点进行对比更新
+    if (patchFlag > 0) {
+      // 如果有，则利用 或与运算 判断需要对那些内容进行对比
+
+      // 节点需要对比的是样式名
+      if (patchFlag & PatchFlags.CLASS) {
+        hostPatchProp(el, 'class', oldProps?.class, newProps.class)
+      }
+
+      // 节点需要对比的是样式
+      if (patchFlag & PatchFlags.STYLE) {
+        hostPatchProp(el, 'style', oldProps?.style, newProps.style)
+      }
+
+      // 节点需要对比的是动态文本
+      if (patchFlag & PatchFlags.TEXT) {
+        if (n1.children !== n2.children) {
+          hostSetElementText(el, n2.children)
+        }
+        return
+      }
+    } else {
+      patchProps(el, oldProps, newProps)
+    }
+
+    if (dynamicChildren && n1.dynamicChildren) {
+      // 只需要更新动态节点
+      patchBlockChildren(
+        n1.dynamicChildren,
+        dynamicChildren,
+        el,
+        parentComponent,
+      )
+    } else {
+      // 更新 children， 全量 diff
+      patchChildren(n1, n2, el, parentComponent)
+    }
+  }
+
+  const patchBlockChildren = (c1, c2, container, parentComponent) => {
+    for (let i = 0; i < c2.length; i++) {
+      patch(c1[i], c2[i], container, null, parentComponent)
+    }
+  }
+
+  /**
+   * 当节点为 Fragment 进行渲染更新
+   * @param n1
+   * @param n2
+   * @param container
+   */
+  const processFragment = (n1, n2, container, parentComponent) => {
+    const { patchFlag } = n2
+    // 挂载 Fragment
+    if (n1 == null) {
+      mountChildren(n2.children, container, parentComponent)
+    } else {
+      if (patchFlag & PatchFlags.STABLE_FRAGMENT) {
+        // 是一个稳定的序列(不会改变)，走动态子节点更新
+        patchBlockChildren(
+          n1.dynamicChildren,
+          n2.dynamicChildren,
+          container,
+          parentComponent,
+        )
+        return
+      }
+
+      // 更新
+      patchChildren(n1, n2, container, parentComponent)
+    }
   }
 
   /**
@@ -449,10 +572,16 @@ export function createRenderer(options) {
    * @param n1 老节点，之前的，如果有，表示要跟 n2 做 diff，更新，如果没有，表示直接挂载 n2
    * @param n2 新节点
    * @param container 挂载到的容器
+   * @param parentComponent 父组件
    */
-  const patch = (n1, n2, container, anchor = null) => {
+  const patch = (n1, n2, container, anchor = null, parentComponent = null) => {
     if (n1 === n2) {
       // 如果是同一个虚拟节点，则啥都不干
+      return
+    }
+
+    if (n1 && n2 == null) {
+      unmount(n1)
       return
     }
 
@@ -462,6 +591,9 @@ export function createRenderer(options) {
      */
     if (n1 && !isSameVNodeType(n1, n2)) {
       // 比如说: n1 = div | n2 = span 。或者 n1.key = 1 | n2.key = 2 都需要特殊的更新
+      // 在卸载 n1 之前，先拿到 n1 的 anchor
+      anchor = hostNextSibling(n1.el)
+
       // 不一样则卸载 n1 ，重新挂载 n2
       unmount(n1)
       // 将 n1 设置为 null 触发下面的重新挂载
@@ -471,20 +603,33 @@ export function createRenderer(options) {
     /**
      * 文本，元素，组件
      */
-    const { shapeFlag, type } = n2
-
+    const { shapeFlag, type, ref } = n2
     switch (type) {
       case Text:
         processText(n1, n2, container, anchor)
         break
+      case Fragment:
+        processFragment(n1, n2, container, parentComponent)
+        break
       default:
         if (shapeFlag & ShapeFlags.ELEMENT) {
           // 处理 DOM 元素: div span p h1
-          processElement(n1, n2, container, anchor)
+          // 元素也需要将父组件传过去，因为有可能出现以下情况 <div><Child></Child></div>
+          processElement(n1, n2, container, anchor, parentComponent)
         } else if (shapeFlag & ShapeFlags.COMPONENT) {
           // 组件
-          processComponent(n1, n2, container, anchor)
+          processComponent(n1, n2, container, anchor, parentComponent)
+        } else if (shapeFlag & ShapeFlags.TELEPORT) {
+          type.process(n1, n2, container, anchor, parentComponent, {
+            mountChildren,
+            patchChildren,
+            options,
+          })
         }
+    }
+
+    if (ref != null) {
+      setRef(ref, n2)
     }
   }
 
@@ -523,10 +668,17 @@ export function createRenderer(options) {
    * @param container
    * @param anchor
    */
-  const processComponent = (n1, n2, container, anchor) => {
+  const processComponent = (n1, n2, container, anchor, parentComponent) => {
     if (n1 == null) {
+      // 判断该组件是否为 KeepAlive 组件中的被缓存的组件，从而决定是否需要重新挂载
+      if (n2.shapeFlag & ShapeFlags.COMPONENT_KEPT_ALIVE) {
+        // 通知 KeepAlive 复用被缓存的组件
+        parentComponent.ctx.activate(n2, container, anchor)
+        return
+      }
+
       // 挂载与更新，自身中的属性发生变化
-      mountComponent(n2, container, anchor)
+      mountComponent(n2, container, anchor, parentComponent)
     } else {
       // 父组件传递的属性发生变化从而进行更新
       updateComponent(n1, n2)
@@ -580,13 +732,13 @@ export function createRenderer(options) {
         triggerHooks(instance, LifeCycleHooks.BEFORE_MOUNT)
 
         // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
-        const subTree = render.call(instance.proxy)
+        const subTree = renderComponentRoot(instance)
+
+        // 将 subTree 挂载到页面中
+        patch(null, subTree, container, anchor, instance)
 
         // 共享真实 DOM 元素，组件的 el 会指向 subTree 的 el
         vnode.el = subTree.el
-
-        // 将 subTree 挂载到页面中
-        patch(null, subTree, container, anchor)
 
         // 保存子树
         instance.subTree = subTree
@@ -615,13 +767,13 @@ export function createRenderer(options) {
         const prevSubTree = instance.subTree
 
         // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
-        const subTree = instance.render.call(instance.proxy)
+        const subTree = renderComponentRoot(instance)
 
         // 将 subTree 挂载到页面中
-        patch(prevSubTree, subTree, container, anchor)
+        patch(prevSubTree, subTree, container, anchor, instance)
 
         // 共享真实 DOM 元素，组件的 el 会指向 subTree 的 el
-        next.el = subTree.el
+        next.el = subTree?.el
 
         // 保存最新的 subTree
         instance.subTree = subTree
@@ -650,14 +802,22 @@ export function createRenderer(options) {
     update()
   }
 
-  const mountComponent = (vnode, container, anchor) => {
+  const mountComponent = (vnode, container, anchor, parentComponent) => {
     /**
      * 1. 创建组件实例
      * 2. 初始化组件的状态
      * 3. 将组件挂载到页面中
      */
     // 创建组件实例
-    const instance = createComponentInstance(vnode)
+    const instance = createComponentInstance(vnode, parentComponent)
+
+    // 在创建组件实例时，如果该组件是 KeepAlive 则给他一个创建 dom 元素的方法，从而避免在 core 层中操作真实的 dom
+    if (isKeepAlive(vnode.type)) {
+      instance.ctx.render = {
+        options,
+        unmount,
+      }
+    }
 
     // 保存实例，方便复用
     vnode.component = instance
@@ -702,13 +862,13 @@ export function createRenderer(options) {
    * @param container
    * @param anchor
    */
-  const processElement = (n1, n2, container, anchor) => {
+  const processElement = (n1, n2, container, anchor, parent) => {
     if (n1 == null) {
       // 挂载 n2
-      mountElement(n2, container, anchor)
+      mountElement(n2, container, anchor, parent)
     } else {
       // 更新 n2
-      patchElement(n1, n2)
+      patchElement(n1, n2, parent)
     }
   }
 

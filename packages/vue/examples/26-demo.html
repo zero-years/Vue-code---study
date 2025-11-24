@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      #app {
+        padding: 100px;
+      }
+
+      .v-enter-active,
+      .v-leave-active {
+        transition: all 0.5s ease;
+      }
+
+      .v-enter-from,
+      .v-leave-to {
+        transform: translateX(50px);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import {
+        ref,
+        createApp,
+        createVNode,
+        openBlock,
+        createElementBlock,
+      } from '../dist/vue.esm.js'
+
+      const App = {
+        setup() {
+          const count = ref(0)
+          const classname = ref('container')
+          const flag = ref(true)
+
+          setTimeout(() => {
+            classname.value = 'dv'
+            flag.value = false
+          }, 2000)
+          return () => {
+            /** oldBlock: [
+             *    pBlock: [
+             *      createVNode('div', { key: 111 }, count.value, 1)
+             *    ],
+             *  ]
+             *
+             *  要实现 pBlock 与 h1Block 进行对比
+             *
+             *  newBlock: [
+             *    h1Block: [
+             *      createVNode('div', { key: 111 }, count.value, 1)
+             *    ]
+             *  ]
+             */
+
+            openBlock()
+            const vnode = createElementBlock('div', null, [
+              flag.value
+                ? (openBlock(),
+                  createElementBlock(
+                    'p',
+                    { class: classname.value },
+                    [createVNode('div', { key: 111 }, count.value, 1)],
+                    2,
+                  ))
+                : (openBlock(),
+                  createElementBlock(
+                    'h1',
+                    { class: classname.value },
+                    [createVNode('div', { key: 111 }, count.value, 1)],
+                    2,
+                  )),
+              createVNode('p', null, 222),
+              createVNode('p', null, 333),
+            ])
+            // const vnode = createElementBlock(
+            //   'div',
+            //   { class: classname.value },
+            //   [createVNode('h2', null, count.value, 1)],
+            //   2,
+            // )
+            console.log('vnode ==>', vnode)
+
+            return vnode
+          }
+        },
+      }
+
+      const app = createApp(App)
+      app.mount('#app')
+    </script>
+  </body>
+</html>

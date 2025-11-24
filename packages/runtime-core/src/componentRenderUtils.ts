@@ -1,3 +1,9 @@
+import { ShapeFlags } from '@vue/shared'
+import {
+  setCurrentRenderingInstance,
+  unsetCurrentRenderingInstance,
+} from './component'
+
 /**
  * 判断新老 props 是否一样，这里的 props 是一个对象
  * @param prevProps
@@ -50,4 +56,30 @@ export function shouldUpdateComponent(n1, n2) {
 
   // 老的有，新的也有，判断 props 是否改变
   return hasPropsChanged(prevProps, nextProps)
+}
+
+export function renderComponentRoot(instance) {
+  const { vnode } = instance
+  // 有状态的组件
+  if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
+    // 将当前渲染的组件实例存储起来
+    setCurrentRenderingInstance(instance)
+
+    // 将子树的 this 指向 setupState 从而能够使用 setupState 返回的状态
+    const subTree = instance.render.call(instance.proxy)
+
+    // 清除存储的实例
+    unsetCurrentRenderingInstance()
+
+    return subTree
+  } else {
+    // 函数式组件
+    return vnode.type(instance.props, {
+      get attrs() {
+        return instance.attrs
+      },
+      slots: instance.slots,
+      emit: instance.emit,
+    })
+  }
 }

@@ -30,11 +30,9 @@
 
       const Child = {
         setup(props, { attrs, slots, emit, expose }) {
-          /**
-           * expose 子组件给父组件暴露的方法，父组件可以通过 ref 获取
-           * 如果子组件有通过 expose 暴露内容，那么父组件通过 ref 只能拿到子组件暴露的内容和 $slots | $props | ... 这些内容
-           * 如果用户没用通过 expose 暴露内容，那父组件通过 ref 可以获得 instance.proxy 上的内容
-           */
+          const vm = getCurrentInstance()
+          console.log('parent ==>', vm.parent)
+          console.log('child ==>', vm)
           expose({
             a: ref(0),
             foo() {
@@ -48,17 +46,18 @@
         },
       }
 
-      const Comp = {
+      const App = {
+        name: 'app',
         setup() {
           const childRef = ref()
           const vm = getCurrentInstance()
 
-          onMounted(() => {
-            // document.querySelector('#container')
-            // console.log(elRef.value)
-            // console.log(childRef.value.a)
-            console.log(vm.proxy.$refs.childRef.a)
-          })
+          // onMounted(() => {
+          //   document.querySelector('#container')
+          //   console.log(elRef.value)
+          //   console.log(childRef.value.a)
+          //   console.log(vm.proxy.$refs.childRef.a)
+          // })
 
           const flag = ref(true)
 
@@ -78,7 +77,7 @@
           }
         },
       }
-      // const Comp = {
+      // const App = {
       //   setup() {
       //     const el = useTemplateRef('elRef')
 
@@ -104,7 +103,7 @@
       //   },
       // }
 
-      const app = createApp(Comp)
+      const app = createApp(App)
 
       app.mount('#app')
     </script>
