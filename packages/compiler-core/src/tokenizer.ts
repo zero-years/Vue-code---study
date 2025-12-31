@@ -54,6 +54,10 @@ export enum State {
   InSFCRootTagName, // 解析单文件组件根标签名
 }
 
+function isTagStart(str) {
+  return /[a-zA-Z]/.test(str)
+}
+
 /**
  * 解析器
  * 基于状态机实现的
@@ -97,30 +101,103 @@ export class Tokenizer {
       switch (this.state) {
         case State.Text: {
           // 正在解析文本
-          // if (str == '<') {
-          //   // 遇到标签，需要切换状态，但切换之前需要将当前的内容进行处理
-          //   this.cbs.ontext(this.sectionStart, this.index)
-          //   // 更新开始位置
-          //   this.sectionStart = this.index + 1
-          //   // 切换状态
-          //   this.state = State.BeforeTagName
-
-          //   console.log('切换状态，开始解析标签')
-          // }
+          this.stateText(str)
 
           break
         }
-        // case State.BeforeTagName: {
-        //   if (str == '>') {
-        //     console.log('标签解析结束')
-        //   }
-        // }
+        case State.BeforeTagName: {
+          this.stateBeforeTagName(str)
+          break
+        }
+        case State.InTagName: {
+          this.stateInTagName(str)
+          break
+        }
+        case State.BeforeAttrName: {
+          this.stateBeforeAttrName(str)
+          break
+        }
+        case State.InClosingTagName: {
+          this.stateInClosingTagName(str)
+          break
+        }
       }
 
       this.index++
     }
 
     this.cleanup()
+  }
+
+  // 处理尾标签的结束标签
+  private stateInClosingTagName(str: string) {
+    // <div></div>
+    if (str == '>') {
+      this.cbs.onclosetag(this.sectionStart, this.index)
+      // 结束后，需从下一个 str 开始继续运行,否则会包含 >
+      this.sectionStart = this.index + 1
+      this.state = State.Text
+    }
+  }
+
+  // 解析头标签中的属性名
+  private stateBeforeAttrName(str: string) {
+    if (str == '>') {
+      // 开始标签解析完毕
+      this.cbs.onopentagend()
+      // 解析标签内的内容，默认为文本
+      this.sectionStart = this.index + 1
+      this.state = State.Text
+    }
+  }
+
+  // 处理头标签名内的内容
+  private stateInTagName(str: string) {
+    // <div></div>
+    if (str == '>' || str == ' ') {
+      // 标签的名称解析完毕
+      this.cbs.onopentagname(this.sectionStart, this.index)
+
+      // 切换为解析属性状态
+      this.state = State.BeforeAttrName
+      this.sectionStart = this.index
+      this.stateBeforeAttrName(str)
+    }
+  }
+
+  // 解析标签名之前的操作
+  private stateBeforeTagName(str: string) {
+    // <div></div>
+    if (isTagStart(str)) {
+      // 表示为开始标签，切换状态
+      this.state = State.InTagName
+      this.sectionStart = this.index
+    } else if (str == '/') {
+      // 表示为结束标签 < /div> index = /
+      this.state = State.InClosingTagName
+      // 结束后，需从下一个 str 开始继续运行,否则会包含 >
+      this.sectionStart = this.index + 1
+    } else {
+      // 并非一个合格的标签,转换为文字处理
+      this.state = State.Text
+    }
+  }
+
+  // 解析文本
+  private stateText(str: string) {
+    if (str == '<') {
+      // 遇到标签，需要切换状态，但切换之前需要将当前的内容进行处理
+      if (this.sectionStart < this.index) {
+        // 处理之前的文本
+        this.cbs.ontext(this.sectionStart, this.index)
+      }
+
+      // 切换状态
+      this.state = State.BeforeTagName
+
+      // 更新开始位置
+      this.sectionStart = this.index
+    }
   }
 
   /**
