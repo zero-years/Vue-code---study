@@ -58,6 +58,10 @@ function isTagStart(str) {
   return /[a-zA-Z]/.test(str)
 }
 
+function isWhiteSpace(str) {
+  return str == ' ' || str == '\n' || str == '\r' || str == '\t'
+}
+
 /**
  * 解析器
  * 基于状态机实现的
@@ -102,23 +106,41 @@ export class Tokenizer {
         case State.Text: {
           // 正在解析文本
           this.stateText(str)
-
           break
         }
         case State.BeforeTagName: {
+          // 解析标签名之前的操作
           this.stateBeforeTagName(str)
           break
         }
         case State.InTagName: {
+          // 处理头标签名内的内容
           this.stateInTagName(str)
           break
         }
         case State.BeforeAttrName: {
+          // 解析头标签中的属性名
           this.stateBeforeAttrName(str)
           break
         }
         case State.InClosingTagName: {
+          // 处理尾标签的结束标签
           this.stateInClosingTagName(str)
+          break
+        }
+        case State.InAttrName: {
+          // 处理标签内的属性名
+          this.stateInAttrName(str)
+          break
+        }
+        case State.AfterAttrName: {
+          // 处理属性名称后的内容，直到遇到双引号
+          this.stateAfterAttrName(str)
+          break
+        }
+        case State.InAttrValueDq: {
+          // 处理双引号中的属性值
+          this.stateInAttrValueDq(str)
           break
         }
       }
@@ -127,6 +149,35 @@ export class Tokenizer {
     }
 
     this.cleanup()
+  }
+
+  private stateInAttrValueDq(str: string) {
+    if (str == '"') {
+      // 属性值获取完毕
+      this.cbs.onattrvalue(this.sectionStart, this.index)
+
+      // 切回去继续解析
+      this.state = State.BeforeAttrName
+      this.sectionStart = this.index
+    }
+  }
+
+  private stateAfterAttrName(str: string) {
+    if (str == '"') {
+      // 遇到双引号，开始解析属性值
+      this.state = State.InAttrValueDq
+      this.sectionStart = this.index + 1
+    }
+  }
+
+  // 处理标签内的属性名
+  private stateInAttrName(str: string) {
+    // 遇到 = 表示属性的名字解析完成
+    if (str == '=') {
+      this.cbs.onattrname(this.sectionStart, this.index)
+      // 属性名解析完毕
+      this.state = State.AfterAttrName
+    }
   }
 
   // 处理尾标签的结束标签
@@ -142,19 +193,27 @@ export class Tokenizer {
 
   // 解析头标签中的属性名
   private stateBeforeAttrName(str: string) {
+    /**
+     * <div id="123"></div>
+     * 可能会遇到 空格，字母, >
+     */
+
     if (str == '>') {
       // 开始标签解析完毕
       this.cbs.onopentagend()
       // 解析标签内的内容，默认为文本
       this.sectionStart = this.index + 1
       this.state = State.Text
+    } else if (!isWhiteSpace(str)) {
+      this.state = State.InAttrName
+      this.sectionStart = this.index
     }
   }
 
   // 处理头标签名内的内容
   private stateInTagName(str: string) {
     // <div></div>
-    if (str == '>' || str == ' ') {
+    if (str == '>' || isWhiteSpace(str)) {
       // 标签的名称解析完毕
       this.cbs.onopentagname(this.sectionStart, this.index)
 

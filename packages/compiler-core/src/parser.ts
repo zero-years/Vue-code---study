@@ -4,6 +4,7 @@ import { Tokenizer } from './tokenizer'
 let currentInput = ''
 let currentRoot
 let currentOpenTag
+let currentprops
 
 function getSlice(start, end) {
   return currentInput.slice(start, end)
@@ -74,6 +75,31 @@ const tokenizer = new Tokenizer({
     } else {
       console.warn('标签不合法')
     }
+  },
+  onattrname(start, end) {
+    currentprops = {
+      // 属性名称
+      name: getSlice(start, end),
+      // 位置信息
+      loc: getLoc(start, end),
+      // 属性值
+      value: undefined,
+    }
+  },
+  onattrvalue(start, end) {
+    const value = getSlice(start, end)
+    currentprops.value = value
+    currentprops.loc = getLoc(start, end + 1)
+    // 如果有标签，则把属性防止进去
+    if (currentOpenTag) {
+      // 第一次添加属性时创建一个 props
+      if (!currentOpenTag.props) {
+        currentOpenTag.props = []
+      }
+      currentOpenTag.props.push(currentprops)
+    }
+    // 清空
+    currentprops = null
   },
 })
 

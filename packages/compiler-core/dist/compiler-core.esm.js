@@ -2,6 +2,9 @@
 function isTagStart(str) {
   return /[a-zA-Z]/.test(str);
 }
+function isWhiteSpace(str) {
+  return str == " " || str == "\n" || str == "\r" || str == "	";
+}
 var Tokenizer = class {
   constructor(cbs) {
     this.cbs = cbs;
@@ -53,10 +56,42 @@ var Tokenizer = class {
           this.stateInClosingTagName(str);
           break;
         }
+        case 12 /* InAttrName */: {
+          this.stateInAttrName(str);
+          break;
+        }
+        case 17 /* AfterAttrName */: {
+          this.stateAfterAttrName(str);
+          break;
+        }
+        case 19 /* InAttrValueDq */: {
+          this.stateInAttrValueDq(str);
+          break;
+        }
       }
       this.index++;
     }
     this.cleanup();
+  }
+  stateInAttrValueDq(str) {
+    if (str == '"') {
+      this.cbs.onattrvalue(this.sectionStart, this.index);
+      this.state = 11 /* BeforeAttrName */;
+      this.sectionStart = this.index;
+    }
+  }
+  stateAfterAttrName(str) {
+    if (str == '"') {
+      this.state = 19 /* InAttrValueDq */;
+      this.sectionStart = this.index + 1;
+    }
+  }
+  // 处理标签内的属性名
+  stateInAttrName(str) {
+    if (str == "=") {
+      this.cbs.onattrname(this.sectionStart, this.index);
+      this.state = 17 /* AfterAttrName */;
+    }
   }
   // 处理尾标签的结束标签
   stateInClosingTagName(str) {
@@ -72,11 +107,14 @@ var Tokenizer = class {
       this.cbs.onopentagend();
       this.sectionStart = this.index + 1;
       this.state = 1 /* Text */;
+    } else if (!isWhiteSpace(str)) {
+      this.state = 12 /* InAttrName */;
+      this.sectionStart = this.index;
     }
   }
   // 处理头标签名内的内容
   stateInTagName(str) {
-    if (str == ">" || str == " ") {
+    if (str == ">" || isWhiteSpace(str)) {
       this.cbs.onopentagname(this.sectionStart, this.index);
       this.state = 11 /* BeforeAttrName */;
       this.sectionStart = this.index;
@@ -136,6 +174,7 @@ var Tokenizer = class {
 var currentInput = "";
 var currentRoot;
 var currentOpenTag;
+var currentprops;
 function getSlice(start, end) {
   return currentInput.slice(start, end);
 }
@@ -194,6 +233,28 @@ var tokenizer = new Tokenizer({
     } else {
       console.warn("\u6807\u7B7E\u4E0D\u5408\u6CD5");
     }
+  },
+  onattrname(start, end) {
+    currentprops = {
+      // 属性名称
+      name: getSlice(start, end),
+      // 位置信息
+      loc: getLoc(start, end),
+      // 属性值
+      value: void 0
+    };
+  },
+  onattrvalue(start, end) {
+    const value = getSlice(start, end);
+    currentprops.value = value;
+    currentprops.loc = getLoc(start, end + 1);
+    if (currentOpenTag) {
+      if (!currentOpenTag.props) {
+        currentOpenTag.props = [];
+      }
+      currentOpenTag.props.push(currentprops);
+    }
+    currentprops = null;
   }
 });
 function createRoot(source) {

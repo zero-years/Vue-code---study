@@ -16,7 +16,9 @@
       // import { parse } from '../../../node_modules/@vue/compiler-dom/dist/compiler-dom.esm-browser.js'
       import { parse } from '../dist/compiler-core.esm.js'
 
-      console.log(parse('<div id="test"></div>'))
+      console.log(
+        parse('<div id="test" class="clas"><span id="hello">hello</span></div>')
+      )
     </script>
   </body>
 </html>
