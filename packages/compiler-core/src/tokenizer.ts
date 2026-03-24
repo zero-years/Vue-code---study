@@ -58,7 +58,7 @@ function isTagStart(str) {
   return /[a-zA-Z]/.test(str)
 }
 
-function isWhiteSpace(str) {
+export function isWhiteSpace(str) {
   return str == ' ' || str == '\n' || str == '\r' || str == '\t'
 }
 
@@ -143,12 +143,27 @@ export class Tokenizer {
           this.stateInAttrValueDq(str)
           break
         }
+        case State.Interpolation: {
+          this.stateInterpolation(str)
+        }
       }
 
       this.index++
     }
 
     this.cleanup()
+  }
+
+  private stateInterpolation(str: string) {
+    // 如果碰到 }} 则表示插值结束
+    if (str == '}') {
+      if (this.buffer[this.index + 1] == '}') {
+        this.index++
+        this.cbs.oninterpolation(this.sectionStart, this.index + 1)
+        this.state = State.Text
+        this.sectionStart = this.index + 1
+      }
+    }
   }
 
   private stateInAttrValueDq(str: string) {
@@ -244,6 +259,12 @@ export class Tokenizer {
 
   // 解析文本
   private stateText(str: string) {
+    /**
+     * 在解析文本的时候，可能会遇到两种情况：
+     * 1. 遇到标签 <，需要切换状态去解析标签
+     * 2. 遇到插值表达式 {{，需要切换状态去解析插值表达式
+     */
+
     if (str == '<') {
       // 遇到标签，需要切换状态，但切换之前需要将当前的内容进行处理
       if (this.sectionStart < this.index) {
@@ -256,6 +277,17 @@ export class Tokenizer {
 
       // 更新开始位置
       this.sectionStart = this.index
+    } else if (str == '{') {
+      // 得遇到两个括号才是插值
+      if (this.buffer[this.index + 1] == '{') {
+        if (this.sectionStart < this.index) {
+          // 处理前面多余的文字信息
+          this.cbs.ontext(this.sectionStart, this.index)
+        }
+        // 转换状态
+        this.state = State.Interpolation
+        this.sectionStart = this.index
+      }
     }
   }
 

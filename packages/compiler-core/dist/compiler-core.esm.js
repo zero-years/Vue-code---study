@@ -68,10 +68,23 @@ var Tokenizer = class {
           this.stateInAttrValueDq(str);
           break;
         }
+        case 3 /* Interpolation */: {
+          this.stateInterpolation(str);
+        }
       }
       this.index++;
     }
     this.cleanup();
+  }
+  stateInterpolation(str) {
+    if (str == "}") {
+      if (this.buffer[this.index + 1] == "}") {
+        this.index++;
+        this.cbs.oninterpolation(this.sectionStart, this.index + 1);
+        this.state = 1 /* Text */;
+        this.sectionStart = this.index + 1;
+      }
+    }
   }
   stateInAttrValueDq(str) {
     if (str == '"') {
@@ -141,6 +154,14 @@ var Tokenizer = class {
       }
       this.state = 5 /* BeforeTagName */;
       this.sectionStart = this.index;
+    } else if (str == "{") {
+      if (this.buffer[this.index + 1] == "{") {
+        if (this.sectionStart < this.index) {
+          this.cbs.ontext(this.sectionStart, this.index);
+        }
+        this.state = 3 /* Interpolation */;
+        this.sectionStart = this.index;
+      }
     }
   }
   /**
@@ -255,6 +276,25 @@ var tokenizer = new Tokenizer({
       currentOpenTag.props.push(currentprops);
     }
     currentprops = null;
+  },
+  oninterpolation(start, end) {
+    let innerStart = start + 2;
+    let innerEnd = end - 2;
+    while (isWhiteSpace(currentInput[innerEnd - 1])) {
+      innerEnd--;
+    }
+    while (isWhiteSpace(currentInput[innerStart])) {
+      innerStart++;
+    }
+    addNode({
+      type: 5 /* INTERPOLATION */,
+      loc: getLoc(start, end),
+      content: {
+        type: 4 /* SIMPLE_EXPRESSION */,
+        content: getSlice(innerStart, innerEnd),
+        loc: getLoc(innerStart, innerEnd)
+      }
+    });
   }
 });
 function createRoot(source) {
