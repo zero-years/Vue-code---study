@@ -18,6 +18,32 @@ function getLoc(start, end) {
   }
 }
 
+function isAllWhitespace(str: string): boolean {
+  for (let i = 0; i < str.length; i++) {
+    if (!isWhiteSpace(str[i])) {
+      return false
+    }
+  }
+  return true
+}
+
+function condenseWhitespace(children) {
+  const _children = [...children]
+  for (let i = 0; i < _children.length; i++) {
+    const node = _children[i]
+    if (node.type == NodeTypes.TEXT) {
+      if (isAllWhitespace(node.content)) {
+        if (i == 0 || i == _children.length - 1) {
+          _children[i] = null
+        } else {
+          _children[i] = ' '
+        }
+      }
+    }
+  }
+  return _children.filter(Boolean)
+}
+
 const stack = []
 function addNode(node) {
   // ;(stack.at(-1) || currentRoot).children.push(node)
@@ -75,6 +101,8 @@ const tokenizer = new Tokenizer({
     } else {
       console.warn('标签不合法')
     }
+
+    lastNode.children = condenseWhitespace(lastNode.children)
   },
   onattrname(start, end) {
     currentprops = {

@@ -209,6 +209,30 @@ function getLoc(start, end) {
     // 内容,
   };
 }
+function isAllWhitespace(str) {
+  for (let i = 0; i < str.length; i++) {
+    if (!isWhiteSpace(str[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+function condenseWhitespace(children) {
+  const _children = [...children];
+  for (let i = 0; i < _children.length; i++) {
+    const node = _children[i];
+    if (node.type == 2 /* TEXT */) {
+      if (isAllWhitespace(node.content)) {
+        if (i == 0 || i == _children.length - 1) {
+          _children[i] = null;
+        } else {
+          _children[i] = " ";
+        }
+      }
+    }
+  }
+  return _children.filter(Boolean);
+}
 var stack = [];
 function addNode(node) {
   const lastNode = stack.at(-1);
@@ -254,6 +278,7 @@ var tokenizer = new Tokenizer({
     } else {
       console.warn("\u6807\u7B7E\u4E0D\u5408\u6CD5");
     }
+    lastNode.children = condenseWhitespace(lastNode.children);
   },
   onattrname(start, end) {
     currentprops = {
